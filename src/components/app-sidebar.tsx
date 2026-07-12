@@ -13,6 +13,7 @@ import {
   Bot,
   LogOut,
   Grid,
+  Settings,
 } from "lucide-react";
 
 import {
@@ -39,10 +40,10 @@ const navItems = [
   { title: "Drivers", url: "/drivers", icon: Users, permission: "driver:read" as const },
   { title: "Trips", url: "/trips", icon: Map, permission: "trip:read" as const },
   { title: "Maintenance", url: "/maintenance", icon: Wrench, permission: "maintenance:read" as const },
-  { title: "Fuel", url: "/fuel", icon: Fuel, permission: "finance:read" as const },
-  { title: "Expenses", url: "/expenses", icon: CreditCard, permission: "finance:read" as const },
+  { title: "Fuel & Expenses", url: "/finance", icon: Fuel, permission: "finance:read" as const },
   { title: "Analytics", url: "/analytics", icon: PieChart, permission: "reports:read" as const },
   { title: "Assistant", url: "/assistant", icon: Bot, permission: "ai:use" as const },
+  { title: "Settings", url: "/settings", icon: Settings, permission: null },
 ];
 
 export function AppSidebar({ user }: { user: any }) {

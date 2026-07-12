@@ -138,28 +138,28 @@ export function AnalyticsClient({ data }: { data: AnalyticsData }) {
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.monthlyRevenue} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted))" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
                 <XAxis 
                   dataKey="name" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} 
+                  tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }} 
                   dy={10}
                 />
                 <YAxis 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} 
+                  tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }} 
                   tickFormatter={(val) => `$${val/1000}k`}
                 />
                 <Tooltip 
-                  cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }}
-                  contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: "8px" }}
-                  itemStyle={{ color: "hsl(var(--foreground))" }}
+                  cursor={false}
+                  contentStyle={{ backgroundColor: "var(--color-card)", borderColor: "var(--color-border)", borderRadius: "8px" }}
+                  itemStyle={{ color: "var(--color-foreground)" }}
                 />
                 <Bar 
                   dataKey="value" 
-                  fill="hsl(var(--primary))" 
+                  fill="var(--color-primary)" 
                   radius={[4, 4, 0, 0]}
                   animationDuration={1500}
                 />
@@ -176,12 +176,12 @@ export function AnalyticsClient({ data }: { data: AnalyticsData }) {
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.costliestVehicles} layout="vertical" margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--muted))" />
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
                 <XAxis 
                   type="number" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                  tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }}
                   tickFormatter={(val) => `$${val/1000}k`}
                 />
                 <YAxis 
@@ -189,13 +189,13 @@ export function AnalyticsClient({ data }: { data: AnalyticsData }) {
                   type="category" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fill: "hsl(var(--foreground))", fontSize: 12, fontWeight: 500 }}
+                  tick={{ fill: "var(--color-muted-foreground)", fontSize: 12, fontWeight: 500 }}
                   width={80}
                 />
                 <Tooltip 
-                  cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }}
-                  contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: "8px" }}
-                  itemStyle={{ color: "hsl(var(--foreground))" }}
+                  cursor={false}
+                  contentStyle={{ backgroundColor: "var(--color-card)", borderColor: "var(--color-border)", borderRadius: "8px" }}
+                  itemStyle={{ color: "var(--color-foreground)" }}
                 />
                 <Bar 
                   dataKey="cost" 

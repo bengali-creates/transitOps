@@ -93,3 +93,13 @@ export const vehicleDocumentsRelations = relations(
     }),
   }),
 );
+
+export const settings = pgTable("settings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  depotName: text("depot_name").notNull().default("Gandhinagar Depot GJ4"),
+  currency: text("currency").notNull().default("INR (Rs)"),
+  distanceUnit: text("distance_unit").notNull().default("Kilometers"),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
