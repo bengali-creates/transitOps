@@ -24,6 +24,8 @@ interface TripClientProps {
 export function TripClient({ initialTrips, vehicles, drivers }: TripClientProps) {
   const [trips, setTrips] = useState(initialTrips);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestionReason, setSuggestionReason] = useState("");
 
   // Form state
   const [source, setSource] = useState("");
@@ -79,6 +81,38 @@ export function TripClient({ initialTrips, vehicles, drivers }: TripClientProps)
     }
   }
   
+  async function handleSuggestMatch() {
+    if (!cargoWeight || !destination) {
+      toast.error("Please enter Destination and Cargo Weight first");
+      return;
+    }
+    setIsSuggesting(true);
+    setSuggestionReason("");
+    try {
+      const res = await fetch("/api/ai/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cargoWeight, targetRegion: destination }),
+      });
+      if (!res.ok) throw new Error("AI request failed");
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      
+      if (data && data.length > 0) {
+        setVehicleId(data[0].vehicleId);
+        setDriverId(data[0].driverId);
+        setSuggestionReason(data[0].reason);
+        toast.success("AI Copilot found the best match!");
+      } else {
+        toast.error("No valid pairings found");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Could not fetch AI suggestions");
+    } finally {
+      setIsSuggesting(false);
+    }
+  }
+
   function handleCancelForm() {
     setSource("");
     setDestination("");
@@ -159,6 +193,18 @@ export function TripClient({ initialTrips, vehicles, drivers }: TripClientProps)
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="flex justify-between items-center py-2">
+              <Button type="button" variant="secondary" size="sm" onClick={handleSuggestMatch} disabled={isSuggesting || !cargoWeight || !destination} className="w-full bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20 border-indigo-500/20 border border-dashed">
+                {isSuggesting ? "Analyzing fleet..." : "✨ Suggest Best Match"}
+              </Button>
+            </div>
+            
+            {suggestionReason && (
+              <div className="text-xs text-indigo-500 bg-indigo-500/10 p-2 rounded border border-indigo-500/20">
+                <strong>AI Reason:</strong> {suggestionReason}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label className="text-xs uppercase text-muted-foreground">Cargo Weight (kg)</Label>
