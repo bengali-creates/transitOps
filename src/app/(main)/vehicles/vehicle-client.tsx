@@ -64,18 +64,27 @@ export function VehicleClient({ initialVehicles, canWrite }: { initialVehicles: 
     });
   }
 
-  async function handleRetire(id: string) {
-    if (confirm("Are you sure you want to retire this vehicle? This action cannot be reversed.")) {
-      startTransition(async () => {
-        try {
-          await retireVehicle(id);
-          toast.success("Vehicle retired");
-          window.location.reload();
-        } catch (err: any) {
-          toast.error(err.message || "Failed to retire vehicle");
+  function handleRetire(id: string) {
+    toast("Are you sure you want to retire this vehicle? This action cannot be reversed.", {
+      action: {
+        label: "Confirm",
+        onClick: () => {
+          startTransition(async () => {
+            try {
+              await retireVehicle(id);
+              toast.success("Vehicle retired");
+              window.location.reload();
+            } catch (err: any) {
+              toast.error(err.message || "Failed to retire vehicle");
+            }
+          });
         }
-      });
-    }
+      },
+      cancel: {
+        label: "Cancel",
+        onClick: () => {}
+      }
+    });
   }
 
   function handleEdit(v: any) {

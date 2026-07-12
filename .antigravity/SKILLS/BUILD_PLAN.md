@@ -245,13 +245,13 @@ Commit: `feat: dashboard with live kpis and filters`
 Goal: the numbers a manager acts on.
 
 Checklist:
-- [ ] Metrics via `lib/utils.ts` and the analytics service: fuel efficiency (distance / fuel), fleet utilization, operational cost, vehicle ROI = (revenue minus (maintenance + fuel)) / acquisition cost.
-- [ ] `/reports` page with Recharts visuals: cost by vehicle, utilization trend, efficiency per vehicle.
-- [ ] CSV export via PapaParse for each report table.
+- [x] Metrics via `lib/utils.ts` and the analytics service: fuel efficiency (distance / fuel), fleet utilization, operational cost, vehicle ROI = (revenue minus (maintenance + fuel)) / acquisition cost.
+- [x] `/reports` page with Recharts visuals: cost by vehicle, utilization trend, efficiency per vehicle.
+- [x] CSV export via PapaParse for each report table.
 
 Verify:
-- [ ] ROI and efficiency match a hand calculation on the seeded data.
-- [ ] CSV downloads and opens correctly.
+- [x] ROI and efficiency match a hand calculation on the seeded data.
+- [x] CSV downloads and opens correctly.
 
 Commit: `feat: reports and analytics with charts and csv export`
 
