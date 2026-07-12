@@ -192,14 +192,14 @@ Commit: `feat: trip management with transactional business rules and status tran
 Goal: opening maintenance pulls a vehicle from the pool, closing returns it. Use `maintenance-service.ts`.
 
 Checklist:
-- [ ] `server/services/maintenance-service.ts`: `openMaintenance`, `closeMaintenance`, transactional, writing `status_history`.
-- [ ] Opening sets the vehicle to in_shop. Closing restores to available unless the vehicle is retired.
-- [ ] Cannot open maintenance on a vehicle that is on_trip.
-- [ ] `/maintenance` page: list of records with status, plus open and close actions and a cost field.
+- [x] `server/services/maintenance-service.ts`: `openMaintenance`, `closeMaintenance`, transactional, writing `status_history`.
+- [x] Opening sets the vehicle to in_shop. Closing restores to available unless the vehicle is retired.
+- [x] Cannot open maintenance on a vehicle that is on_trip.
+- [x] `/maintenance` page: list of records with status, plus open and close actions and a cost field.
 
 Verify:
-- [ ] Opening maintenance on a vehicle immediately removes it from the trip dispatch dropdown.
-- [ ] Closing maintenance returns it to the dropdown.
+- [x] Opening maintenance on a vehicle immediately removes it from the trip dispatch dropdown.
+- [x] Closing maintenance returns it to the dropdown.
 
 Commit: `feat: maintenance workflow with automatic in-shop transitions`
 
@@ -210,13 +210,13 @@ Commit: `feat: maintenance workflow with automatic in-shop transitions`
 Goal: record costs and compute operational cost per vehicle.
 
 Checklist:
-- [ ] `fuelLogSchema` and `expenseSchema` in validations.
-- [ ] Actions for fuel logs (vehicle, optional trip, litres, cost, odometer, date) and expenses (type, amount, date, optional links).
-- [ ] `/fuel` and `/expenses` pages with tables and create dialogs.
-- [ ] An `analytics` service function computes total operational cost per vehicle = fuel + maintenance + expenses.
+- [x] `fuelLogSchema` and `expenseSchema` in validations.
+- [x] Actions for fuel logs (vehicle, optional trip, litres, cost, odometer, date) and expenses (type, amount, date, optional links).
+- [x] `/fuel` and `/expenses` pages with tables and create dialogs.
+- [x] An `analytics` service function computes total operational cost per vehicle = fuel + maintenance + expenses.
 
 Verify:
-- [ ] Adding a fuel log and a maintenance cost updates that vehicle's total operational cost.
+- [x] Adding a fuel log and a maintenance cost updates that vehicle's total operational cost.
 
 Commit: `feat: fuel and expense tracking with operational cost computation`
 
