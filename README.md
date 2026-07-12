@@ -35,6 +35,19 @@ All use the password `Password123!`.
 - `driver@transitops.dev` : Driver
 - `safety@transitops.dev` : Safety Officer
 - `finance@transitops.dev` : Financial Analyst
+- `admin@transitops.dev` : Admin
+
+## Implemented Features
+
+Here is a list of the core capabilities currently implemented in the platform:
+
+- **Authentication & RBAC:** Secure login system with JWT sessions and strict role-based access control (Admin, Fleet Manager, Driver, Safety Officer, Financial Analyst).
+- **Vehicle Registry:** Full CRUD management for fleet assets. Enforces unique registration numbers and tracks vehicle status (Available, In Shop, On Trip, Retired).
+- **Driver Management:** Manage driver profiles with compliance tracking (license expiry warnings) and safety score monitoring.
+- **Maintenance Workflow:** Open and close maintenance records that automatically update the vehicle's status (pulling it from the available dispatch pool while in the shop).
+- **Fuel & Expense Tracking:** Log fuel consumption and general expenses to automatically compute and aggregate the total operational cost per vehicle.
+- **Reports & Analytics:** A responsive dashboard featuring key performance indicators (Fuel Efficiency, Fleet Utilization, Operational Cost, Vehicle ROI), visual charts powered by Recharts, and a flawless CSV export functionality.
+- **Settings & Access Configuration:** Configure general application settings (Depot Name, Currency) and visualize the RBAC matrix to understand role permissions at a glance.
 
 ## The one rule that keeps it correct
 
