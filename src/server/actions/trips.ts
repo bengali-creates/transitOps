@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { trips } from "@/db/schema";
 import { tripCreateSchema, tripCompleteSchema } from "@/lib/validations";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission } from "@/lib/auth";
 import {
   dispatchTrip,
   completeTrip,
