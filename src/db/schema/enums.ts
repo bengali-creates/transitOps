@@ -1,15 +1,11 @@
 import { pgEnum } from "drizzle-orm/pg-core";
 
-/**
- * Central place for every enumerated value used across the schema.
- * Keeping enums in one file avoids circular imports between table files.
- */
-
 export const userRoleEnum = pgEnum("user_role", [
   "fleet_manager",
   "driver",
   "safety_officer",
   "financial_analyst",
+  "admin",
 ]);
 
 export const vehicleStatusEnum = pgEnum("vehicle_status", [

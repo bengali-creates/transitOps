@@ -3,10 +3,7 @@ import bcrypt from "bcryptjs";
 import { db } from "./index";
 import { roles, users, vehicles, drivers } from "./schema";
 
-/**
- * Idempotent-ish seed for demos. Run with: npm run db:seed
- * Creates one login per role, plus a small starter fleet.
- */
+
 async function main() {
   console.log("Seeding roles...");
   const roleRows = await db
@@ -16,6 +13,7 @@ async function main() {
       { name: "driver", description: "Creates trips and monitors deliveries" },
       { name: "safety_officer", description: "Tracks compliance and safety scores" },
       { name: "financial_analyst", description: "Reviews expenses and profitability" },
+      { name: "admin", description: "System administrator with full access" },
     ])
     .onConflictDoNothing()
     .returning();
@@ -53,6 +51,13 @@ async function main() {
         email: "finance@transitops.dev",
         role: "financial_analyst",
         roleId: roleByName.get("financial_analyst"),
+        passwordHash,
+      },
+      {
+        name: "Adam Admin",
+        email: "admin@transitops.dev",
+        role: "admin",
+        roleId: roleByName.get("admin"),
         passwordHash,
       },
     ])

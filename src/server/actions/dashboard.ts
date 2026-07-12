@@ -1,0 +1,65 @@
+"use server";
+
+import { db } from "@/db";
+import { vehicles, trips, drivers } from "@/db/schema";
+import { sql, eq, and, ilike } from "drizzle-orm";
+import { requirePermission } from "@/lib/auth";
+
+export async function getDashboardStats(filters?: { type?: string, status?: string, region?: string, q?: string }) {
+  // Ensure the user has permission to view the dashboard (requires at least basic read access)
+  // Fleet managers, dispatchers, etc. can all read the dashboard. We can use a general read permission
+  // or let the page component handle authorization. We'll verify they have some read permission.
+  await requirePermission("trip:read");
+
+  const vehicleConditions = [];
+  if (filters?.type && filters.type !== "all") vehicleConditions.push(eq(vehicles.type, filters.type));
+  if (filters?.status && filters.status !== "all") vehicleConditions.push(eq(vehicles.status, filters.status as any));
+  if (filters?.region && filters.region !== "all") vehicleConditions.push(eq(vehicles.region, filters.region));
+  if (filters?.q) vehicleConditions.push(ilike(vehicles.registrationNumber, `%${filters.q}%`));
+
+  const [vehicleStats] = await db
+    .select({
+      total: sql<number>`count(*)`,
+      available: sql<number>`count(*) filter (where ${vehicles.status} = 'available')`,
+      inShop: sql<number>`count(*) filter (where ${vehicles.status} = 'in_shop')`,
+      onTrip: sql<number>`count(*) filter (where ${vehicles.status} = 'on_trip')`,
+      retired: sql<number>`count(*) filter (where ${vehicles.status} = 'retired')`,
+    })
+    .from(vehicles)
+    .where(vehicleConditions.length > 0 ? and(...vehicleConditions) : undefined);
+
+  const [tripStats] = await db
+    .select({
+      total: sql<number>`count(*)`,
+      active: sql<number>`count(*) filter (where ${trips.status} = 'dispatched')`,
+      pending: sql<number>`count(*) filter (where ${trips.status} = 'draft')`,
+    })
+    .from(trips);
+
+  const [driverStats] = await db
+    .select({
+      onDuty: sql<number>`count(*) filter (where ${drivers.status} = 'on_trip' or ${drivers.status} = 'available')`,
+    })
+    .from(drivers);
+
+  const recentTrips = await db
+    .select({
+      id: trips.id,
+      tripNumber: trips.id,
+      vehicleName: vehicles.registrationNumber,
+      driverName: drivers.name,
+      status: trips.status,
+      eta: trips.plannedDistance, 
+    })
+    .from(trips)
+    .leftJoin(vehicles, eq(trips.vehicleId, vehicles.id))
+    .leftJoin(drivers, eq(trips.driverId, drivers.id))
+    .limit(5);
+
+  return {
+    vehicleStats,
+    tripStats,
+    driverStats,
+    recentTrips,
+  };
+}

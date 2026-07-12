@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { users, accounts, sessions, verificationTokens } from "../db/schema";
+import { can, type Role, type Permission } from "../lib/rbac";
 import { z } from "zod";
 
 const credentialsSchema = z.object({
@@ -12,10 +13,6 @@ const credentialsSchema = z.object({
   password: z.string().min(1),
 });
 
-/**
- * Credentials auth with a JWT session strategy. The user role is copied into the
- * token at sign in so middleware and RBAC guards can read it without a DB hit.
- */
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: DrizzleAdapter(db, {
     usersTable: users,
@@ -67,3 +64,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
 });
+
+export async function requirePermission(permission: Permission) {
+  const session = await auth();
+  const role = (session?.user as { role?: Role } | undefined)?.role;
+  if (!can(role, permission)) {
+    throw new Error("Forbidden: missing permission " + permission);
+  }
+  return { session, role: role as Role };
+}

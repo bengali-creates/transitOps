@@ -48,6 +48,7 @@ export function LoginForm() {
     if (value === "dispatcher") form.setValue("email", "driver@transitops.dev");
     if (value === "safety_officer") form.setValue("email", "safety@transitops.dev");
     if (value === "financial_analyst") form.setValue("email", "finance@transitops.dev");
+    if (value === "admin") form.setValue("email", "admin@transitops.dev");
   };
 
   const onSubmit = async (data: LoginFormValues) => {
@@ -92,7 +93,7 @@ export function LoginForm() {
           </p>
 
           <div className="space-y-4">
-            <h2 className="text-xl font-medium mb-6">One login, four roles:</h2>
+            <h2 className="text-xl font-medium mb-6">One login, five roles:</h2>
             <ul className="space-y-3 text-muted-foreground">
               <li className="flex items-center gap-3">
                 <div className="w-2 h-2 rounded-full bg-amber-600" />
@@ -109,6 +110,10 @@ export function LoginForm() {
               <li className="flex items-center gap-3">
                 <div className="w-2 h-2 rounded-full bg-amber-600" />
                 Financial Analyst
+              </li>
+              <li className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-amber-600" />
+                Admin
               </li>
             </ul>
           </div>
@@ -175,6 +180,7 @@ export function LoginForm() {
                   <SelectItem value="dispatcher">Dispatcher</SelectItem>
                   <SelectItem value="safety_officer">Safety Officer</SelectItem>
                   <SelectItem value="financial_analyst">Financial Analyst</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
             </div>

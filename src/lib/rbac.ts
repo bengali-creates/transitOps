@@ -1,10 +1,10 @@
-import { auth } from "./auth";
 
 export type Role =
   | "fleet_manager"
   | "driver"
   | "safety_officer"
-  | "financial_analyst";
+  | "financial_analyst"
+  | "admin";
 
 export type Permission =
   | "vehicle:read"
@@ -21,10 +21,6 @@ export type Permission =
   | "reports:read"
   | "ai:use";
 
-/**
- * Permission matrix. Fleet Manager is the superset for fleet assets. Each role
- * gets exactly what its job description in the brief requires, nothing more.
- */
 const MATRIX: Record<Role, Permission[]> = {
   fleet_manager: [
     "vehicle:read",
@@ -53,19 +49,24 @@ const MATRIX: Record<Role, Permission[]> = {
     "trip:read",
     "ai:use",
   ],
+  admin: [
+    "vehicle:read",
+    "vehicle:write",
+    "driver:read",
+    "driver:write",
+    "driver:compliance",
+    "trip:read",
+    "trip:write",
+    "maintenance:read",
+    "maintenance:write",
+    "finance:read",
+    "finance:write",
+    "reports:read",
+    "ai:use",
+  ],
 };
 
 export function can(role: Role | undefined, permission: Permission): boolean {
   if (!role) return false;
   return MATRIX[role]?.includes(permission) ?? false;
-}
-
-/** Server-side guard. Throws when the current session lacks the permission. */
-export async function requirePermission(permission: Permission) {
-  const session = await auth();
-  const role = (session?.user as { role?: Role } | undefined)?.role;
-  if (!can(role, permission)) {
-    throw new Error("Forbidden: missing permission " + permission);
-  }
-  return { session, role: role as Role };
 }

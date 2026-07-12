@@ -8,6 +8,13 @@
       "when": 1783842789937,
       "tag": "0000_long_the_spike",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783848902839,
+      "tag": "0001_bored_katie_power",
+      "breakpoints": true
     }
   ]
 }
