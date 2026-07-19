@@ -10,8 +10,8 @@ interface ChartData {
 
 export function DashboardCharts({ data }: { data: ChartData[] }) {
   return (
-    <div className="h-[200px] w-full mt-4">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="h-[200px] w-full ">
+      <ResponsiveContainer width="100%" height="100%" className="m-0 p-0">
         <BarChart data={data} layout="vertical" margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
           <XAxis type="number" hide />
           <YAxis 
@@ -19,12 +19,12 @@ export function DashboardCharts({ data }: { data: ChartData[] }) {
             type="category" 
             axisLine={false} 
             tickLine={false} 
-            tick={{ fill: "#a1a1aa", fontSize: 12 }}
+            tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }}
             width={80}
           />
           <Tooltip 
             cursor={{ fill: "transparent" }}
-            contentStyle={{ backgroundColor: "#18181b", borderColor: "#27272a", borderRadius: "8px", color: "#fff" }}
+            contentStyle={{ backgroundColor: "var(--color-card)", borderColor: "var(--color-border)", borderRadius: "8px", color: "var(--color-card-foreground)" }}
           />
           <Bar 
             dataKey="value" 
