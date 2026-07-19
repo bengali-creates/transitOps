@@ -11,10 +11,6 @@ import { relations } from "drizzle-orm";
 import { vehicleStatusEnum, driverStatusEnum } from "./enums";
 import { users } from "./auth";
 
-/**
- * Vehicle registry. registrationNumber is unique per business rule.
- * numeric columns use string mode in Drizzle so money and load values stay exact.
- */
 export const vehicles = pgTable("vehicles", {
   id: uuid("id").defaultRandom().primaryKey(),
   registrationNumber: text("registration_number").notNull().unique(),
@@ -42,10 +38,6 @@ export const vehicles = pgTable("vehicles", {
     .$onUpdate(() => new Date()),
 });
 
-/**
- * Driver profiles. safetyScore is 0 to 100. An optional userId links a driver
- * profile to a login account when the driver is also an app user.
- */
 export const drivers = pgTable("drivers", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),

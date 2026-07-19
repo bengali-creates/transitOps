@@ -15,11 +15,6 @@ import {
 import { vehicles, drivers } from "./fleet";
 import { users } from "./auth";
 
-/**
- * Trips. Lifecycle: draft -> dispatched -> completed | cancelled.
- * revenue is optional and drives the ROI report. Timestamp columns record
- * each transition so the analytics layer can measure cycle time.
- */
 export const trips = pgTable("trips", {
   id: uuid("id").defaultRandom().primaryKey(),
   source: text("source").notNull(),
@@ -54,10 +49,6 @@ export const trips = pgTable("trips", {
     .$onUpdate(() => new Date()),
 });
 
-/**
- * Maintenance logs. Opening an active (open) record moves the vehicle to in_shop.
- * Closing it restores the vehicle to available unless it was retired.
- */
 export const maintenanceLogs = pgTable("maintenance_logs", {
   id: uuid("id").defaultRandom().primaryKey(),
   vehicleId: uuid("vehicle_id")
@@ -82,10 +73,6 @@ export const maintenanceLogs = pgTable("maintenance_logs", {
     .$onUpdate(() => new Date()),
 });
 
-/**
- * Fuel logs. Linked to a vehicle and optionally the trip during which fuel was
- * consumed. odometer at fill time supports distance and efficiency math.
- */
 export const fuelLogs = pgTable("fuel_logs", {
   id: uuid("id").defaultRandom().primaryKey(),
   vehicleId: uuid("vehicle_id")
@@ -102,10 +89,6 @@ export const fuelLogs = pgTable("fuel_logs", {
     .defaultNow(),
 });
 
-/**
- * General expenses (tolls, parking, misc). Maintenance and fuel have their own
- * tables, but expense rows can also reference them for a single cost ledger.
- */
 export const expenses = pgTable("expenses", {
   id: uuid("id").defaultRandom().primaryKey(),
   vehicleId: uuid("vehicle_id").references(() => vehicles.id),

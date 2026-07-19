@@ -9,11 +9,6 @@ import {
 import { relations } from "drizzle-orm";
 import { userRoleEnum } from "./enums";
 
-/**
- * Roles master table. Seeded with the four operational roles.
- * RBAC is enforced in code (lib/rbac.ts) using the role name carried on the user.
- * The table exists so permissions can be extended later without a migration on users.
- */
 export const roles = pgTable("roles", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: userRoleEnum("name").notNull().unique(),
@@ -23,10 +18,6 @@ export const roles = pgTable("roles", {
     .defaultNow(),
 });
 
-/**
- * Application users. Password auth is handled through Auth.js credentials.
- * The role column is the fast path used by middleware and RBAC guards.
- */
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
@@ -45,7 +36,6 @@ export const users = pgTable("users", {
     .$onUpdate(() => new Date()),
 });
 
-/** Auth.js adapter table. Kept so OAuth providers can be added without a migration. */
 export const accounts = pgTable(
   "accounts",
   {

@@ -1,7 +1,7 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { db } from "./index";
-import { roles, users, vehicles, drivers } from "./schema";
+import { roles, users, vehicles, drivers, trips, maintenanceLogs, fuelLogs, expenses } from "./schema";
 
 
 async function main() {
@@ -116,6 +116,83 @@ async function main() {
       },
     ])
     .onConflictDoNothing();
+
+  console.log("Seeding trips and other operations...");
+  const vRows = await db.select().from(vehicles);
+  const dRows = await db.select().from(drivers);
+
+  if (vRows.length > 0 && dRows.length > 0) {
+    const statuses = ["draft", "dispatched", "completed", "cancelled"] as const;
+    const maintenanceStatuses = ["open", "closed"] as const;
+    const expenseTypes = ["fuel", "toll", "maintenance", "parking", "other"] as const;
+    const regions = ["East", "West", "North", "South"];
+
+    const newTrips = [];
+    for (let i = 0; i < 30; i++) {
+      const v = vRows[i % vRows.length];
+      const d = dRows[i % dRows.length];
+      const plannedDist = Math.floor(Math.random() * 200 + 10);
+      const isCompleted = Math.random() > 0.5;
+      newTrips.push({
+        source: `Location ${i}`,
+        destination: `Location ${i + 1}`,
+        vehicleId: v.id,
+        driverId: d.id,
+        cargoWeight: Math.floor(Math.random() * 1000 + 100).toString(),
+        plannedDistance: plannedDist.toString(),
+        actualDistance: isCompleted ? (plannedDist + Math.random() * 5).toFixed(2) : null,
+        startOdometer: (Number(v.odometer || 0) + i * 100).toString(),
+        finalOdometer: isCompleted ? (Number(v.odometer || 0) + i * 100 + plannedDist).toString() : null,
+        status: statuses[Math.floor(Math.random() * statuses.length)],
+        revenue: isCompleted ? (Math.random() * 500 + 50).toFixed(2) : null,
+      });
+    }
+
+    const tripRows = await db.insert(trips).values(newTrips).returning();
+
+    const newMaintenanceLogs = [];
+    for (let i = 0; i < 15; i++) {
+      const v = vRows[i % vRows.length];
+      newMaintenanceLogs.push({
+        vehicleId: v.id,
+        type: ["Oil Change", "Brakes", "Tires", "Engine Check"][Math.floor(Math.random() * 4)],
+        cost: (Math.random() * 300 + 50).toFixed(2),
+        odometer: (Number(v.odometer || 0) + i * 500).toString(),
+        status: maintenanceStatuses[Math.floor(Math.random() * maintenanceStatuses.length)],
+      });
+    }
+    await db.insert(maintenanceLogs).values(newMaintenanceLogs);
+
+    const newFuelLogs = [];
+    const newExpenses = [];
+    
+    for (let i = 0; i < tripRows.length; i++) {
+      const trip = tripRows[i];
+      if (Math.random() > 0.3) {
+        newFuelLogs.push({
+          vehicleId: trip.vehicleId,
+          tripId: trip.id,
+          liters: (Math.random() * 50 + 10).toFixed(2),
+          cost: (Math.random() * 100 + 20).toFixed(2),
+          odometer: trip.startOdometer,
+          loggedDate: new Date().toISOString().split("T")[0],
+        });
+      }
+      if (Math.random() > 0.5) {
+        newExpenses.push({
+          vehicleId: trip.vehicleId,
+          tripId: trip.id,
+          type: expenseTypes[Math.floor(Math.random() * expenseTypes.length)],
+          amount: (Math.random() * 50 + 5).toFixed(2),
+          description: `Random expense ${i}`,
+          incurredDate: new Date().toISOString().split("T")[0],
+        });
+      }
+    }
+    
+    if (newFuelLogs.length > 0) await db.insert(fuelLogs).values(newFuelLogs);
+    if (newExpenses.length > 0) await db.insert(expenses).values(newExpenses);
+  }
 
   console.log("Seed complete.");
   process.exit(0);
