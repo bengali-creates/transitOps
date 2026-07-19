@@ -16,12 +16,11 @@ export default async function VehiclesPage() {
     redirect("/");
   }
 
-  const vehicles = await listVehicles();
   const canWrite = can(role, "vehicle:write");
 
   return (
     <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto w-full">
-      <VehicleClient initialVehicles={vehicles} canWrite={canWrite} />
+      <VehicleClient canWrite={canWrite} />
     </div>
   );
 }

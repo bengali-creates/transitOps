@@ -63,3 +63,25 @@ export async function cancelTripAction(tripId: string) {
   revalidatePath("/dashboard");
   return result;
 }
+
+import { desc } from "drizzle-orm";
+export async function listTrips({ pageParam = 0 }: { pageParam?: number } = {}) {
+  await requirePermission("trip:read");
+  const limit = 10;
+  const offset = pageParam * limit;
+
+  const data = await db.query.trips.findMany({
+    with: {
+      vehicle: true,
+      driver: true,
+    },
+    orderBy: [desc(trips.createdAt)],
+    limit,
+    offset,
+  });
+
+  return {
+    data,
+    nextPage: data.length === limit ? pageParam + 1 : undefined,
+  };
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,10 +24,42 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createExpense } from "@/server/actions/expenses";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { getExpenses } from "@/server/actions/expenses";
+import { listVehicles } from "@/server/actions/vehicles";
 
-export function ExpensesClient({ initialLogs, vehicles, canWrite }: { initialLogs: any[], vehicles: any[], canWrite: boolean }) {
+export function ExpensesClient({ canWrite }: { canWrite: boolean }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  const { data: vehiclesData } = useQuery({
+    queryKey: ["vehicles-list"],
+    queryFn: () => listVehicles({ pageParam: 0 }),
+  });
+  const vehicles = vehiclesData?.data || [];
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ["expenses-logs"],
+    queryFn: async ({ pageParam = 0 }) => {
+      return getExpenses({ pageParam });
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage: any) => lastPage.nextPage,
+  });
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    }, { root: null, rootMargin: "20px", threshold: 1.0 });
+
+    if (loadMoreRef.current) observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasNextPage, fetchNextPage, isFetchingNextPage]);
+
+  const displayLogs = data?.pages.flatMap((page) => page.data) || [];
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -133,7 +165,7 @@ export function ExpensesClient({ initialLogs, vehicles, canWrite }: { initialLog
               </TableRow>
             </TableHeader>
             <TableBody>
-              {initialLogs.map((log) => (
+              {displayLogs.map((log: any) => (
                 <TableRow key={log.id}>
                   <TableCell>{new Date(log.incurredDate).toLocaleDateString()}</TableCell>
                   <TableCell className="capitalize">{log.type}</TableCell>
@@ -142,7 +174,7 @@ export function ExpensesClient({ initialLogs, vehicles, canWrite }: { initialLog
                   <TableCell className="text-right">${Number(log.amount).toLocaleString()}</TableCell>
                 </TableRow>
               ))}
-              {initialLogs.length === 0 && (
+              {displayLogs.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                     No expenses found.
@@ -151,6 +183,10 @@ export function ExpensesClient({ initialLogs, vehicles, canWrite }: { initialLog
               )}
             </TableBody>
           </Table>
+
+          <div ref={loadMoreRef} className="h-4 w-full flex items-center justify-center py-4">
+            {isFetchingNextPage && <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
+          </div>
         </CardContent>
       </Card>
     </div>

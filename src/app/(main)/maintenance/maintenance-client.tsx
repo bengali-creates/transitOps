@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { format } from "date-fns";
 import {
   Table,
@@ -31,24 +31,59 @@ import {
 import { createMaintenance, finishMaintenance } from "@/server/actions/maintenance";
 import { toast } from "sonner";
 import { CheckCircle2Icon } from "lucide-react";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { listMaintenanceLogs } from "@/server/actions/maintenance";
+import { listVehicles } from "@/server/actions/vehicles";
 
 export function MaintenanceClient({
-  initialLogs,
-  vehicles,
   canWrite,
 }: {
-  initialLogs: any[];
-  vehicles: any[];
   canWrite: boolean;
 }) {
-  const [logs, setLogs] = useState(initialLogs);
   const [isPending, startTransition] = useTransition();
 
-  // Filter vehicles that can be sent to maintenance
-  const eligibleVehicles = vehicles.filter(
+  // Fetch vehicles for the dropdown
+  const { data: vehiclesData } = useQuery({
+    queryKey: ["vehicles-list"],
+    queryFn: () => listVehicles({ pageParam: 0 }),
+  });
+
+  const allVehicles = vehiclesData?.data || [];
+  const eligibleVehicles = allVehicles.filter(
     (v) => v.status !== "on_trip" && v.status !== "retired"
   );
 
+  const {data,fetchNextPage,hasNextPage,isFetchingNextPage,status}=useInfiniteQuery({
+    queryKey:["maintenance-logs"],
+    queryFn: async ({pageParam=0})=>{
+      return listMaintenanceLogs({pageParam})
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage: any) => lastPage.nextPage,
+  });
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    }, {
+      root: null,
+      rootMargin: "20px",
+      threshold: 1.0,
+    });
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasNextPage, fetchNextPage, isFetchingNextPage]);
+
+  // Flatten the pages into a single array of logs
+  const displayLogs = data?.pages.flatMap((page) => page.data) || [];
+    
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "open":
@@ -109,12 +144,12 @@ export function MaintenanceClient({
 
   return (
     <div className="space-y-6 w-full max-w-7xl mx-auto">
-      <div>
+      {/* <div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Maintenance</h1>
         <p className="text-muted-foreground mt-1 text-sm sm:text-base">
           Log and track vehicle maintenance and repairs.
         </p>
-      </div>
+      </div> */}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: Form */}
@@ -125,8 +160,8 @@ export function MaintenanceClient({
               <CardDescription>Open a new maintenance request</CardDescription>
             </CardHeader>
             <CardContent>
-              <form action={onSubmit} className="space-y-4">
-                <div className="space-y-2 w-full">
+              <form action={onSubmit} className="space-y-2">
+                <div className="space-y-1 w-full">
                   <Label htmlFor="vehicleId">Vehicle</Label>
                   <Select name="vehicleId" required disabled={!canWrite || isPending}>
                     <SelectTrigger className="w-full">
@@ -148,7 +183,7 @@ export function MaintenanceClient({
                   </Select>
                 </div>
 
-                <div className="space-y-2 w-full">
+                <div className="space-y-1 w-full">
                   <Label htmlFor="type">Service Type</Label>
                   <Select name="type" required disabled={!canWrite || isPending}>
                     <SelectTrigger className="w-full">
@@ -165,7 +200,7 @@ export function MaintenanceClient({
                   </Select>
                 </div>
 
-                <div className="space-y-2 w-full">
+                <div className="space-y-1 w-full">
                   <Label htmlFor="description">Description</Label>
                   <Input 
                     id="description" 
@@ -176,7 +211,7 @@ export function MaintenanceClient({
                   />
                 </div>
 
-                <div className="space-y-2 w-full">
+                <div className="space-y-1 w-full">
                   <Label htmlFor="cost">Cost</Label>
                   <Input
                     id="cost"
@@ -191,7 +226,7 @@ export function MaintenanceClient({
                   />
                 </div>
                 
-                <div className="space-y-2 w-full">
+                <div className="space-y-1 w-full">
                   <Label htmlFor="odometer">Odometer (Optional)</Label>
                   <Input
                     id="odometer"
@@ -231,13 +266,13 @@ export function MaintenanceClient({
 
         {/* Right Column: Table */}
         <div className="lg:col-span-8">
-          <Card className="w-full h-full min-h-[500px]">
+          <Card className="w-full h-full ">
             <CardHeader>
               <CardTitle className="text-lg">SERVICE LOG</CardTitle>
               <CardDescription>History of all vehicle maintenance</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border bg-card w-full overflow-x-auto">
+              <div className="rounded-md border bg-card w-full overflow-x-auto  overflow-y-auto h-[62vh]">
                 <Table className="min-w-[600px] w-full">
                   <TableHeader>
                     <TableRow>
@@ -250,7 +285,7 @@ export function MaintenanceClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {logs.map((log) => (
+                    {displayLogs.map((log: any) => (
                       <TableRow key={log.id}>
                         <TableCell className="font-medium whitespace-nowrap">
                           {log.vehicle?.registrationNumber || "Unknown"}
@@ -279,7 +314,7 @@ export function MaintenanceClient({
                         )}
                       </TableRow>
                     ))}
-                    {logs.length === 0 && (
+                    {displayLogs.length === 0 && (
                       <TableRow>
                         <TableCell
                           colSpan={canWrite ? 6 : 5}
@@ -291,6 +326,11 @@ export function MaintenanceClient({
                     )}
                   </TableBody>
                 </Table>
+                
+                {/* Intersection observer target for infinite scroll */}
+                <div ref={loadMoreRef} className="h-4 w-full flex items-center justify-center py-4">
+                  {isFetchingNextPage && <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
+                </div>
               </div>
             </CardContent>
           </Card>

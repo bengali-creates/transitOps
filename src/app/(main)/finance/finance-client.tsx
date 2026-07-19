@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,18 +26,16 @@ import { createExpense } from "@/server/actions/expenses";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { getFuelLogs } from "@/server/actions/fuel";
+import { getExpenses } from "@/server/actions/expenses";
+import { listVehicles } from "@/server/actions/vehicles";
 
 export function FinanceClient({ 
-  initialFuelLogs, 
-  initialExpenses, 
-  vehicles, 
   trips,
   totalOperationalCost, 
   canWrite 
 }: { 
-  initialFuelLogs: any[], 
-  initialExpenses: any[], 
-  vehicles: any[], 
   trips: any[],
   totalOperationalCost: number, 
   canWrite: boolean 
@@ -45,6 +43,62 @@ export function FinanceClient({
   const [fuelOpen, setFuelOpen] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  const fuelLoadMoreRef = useRef<HTMLDivElement>(null);
+  const expenseLoadMoreRef = useRef<HTMLDivElement>(null);
+
+  const { data: vehiclesData } = useQuery({
+    queryKey: ["vehicles-list"],
+    queryFn: () => listVehicles({ pageParam: 0 }),
+  });
+  const vehicles = vehiclesData?.data || [];
+
+  const { 
+    data: fuelData, 
+    fetchNextPage: fetchNextFuelPage, 
+    hasNextPage: hasNextFuelPage, 
+    isFetchingNextPage: isFetchingNextFuelPage 
+  } = useInfiniteQuery({
+    queryKey: ["fuel-logs"],
+    queryFn: async ({ pageParam = 0 }) => getFuelLogs({ pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage: any) => lastPage.nextPage,
+  });
+
+  const { 
+    data: expenseData, 
+    fetchNextPage: fetchNextExpensePage, 
+    hasNextPage: hasNextExpensePage, 
+    isFetchingNextPage: isFetchingNextExpensePage 
+  } = useInfiniteQuery({
+    queryKey: ["expenses-logs"],
+    queryFn: async ({ pageParam = 0 }) => getExpenses({ pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage: any) => lastPage.nextPage,
+  });
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasNextFuelPage && !isFetchingNextFuelPage) {
+        fetchNextFuelPage();
+      }
+    }, { root: null, rootMargin: "20px", threshold: 1.0 });
+    if (fuelLoadMoreRef.current) observer.observe(fuelLoadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasNextFuelPage, fetchNextFuelPage, isFetchingNextFuelPage]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasNextExpensePage && !isFetchingNextExpensePage) {
+        fetchNextExpensePage();
+      }
+    }, { root: null, rootMargin: "20px", threshold: 1.0 });
+    if (expenseLoadMoreRef.current) observer.observe(expenseLoadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasNextExpensePage, fetchNextExpensePage, isFetchingNextExpensePage]);
+
+  const displayFuelLogs = fuelData?.pages.flatMap((page) => page.data) || [];
+  const displayExpenses = expenseData?.pages.flatMap((page) => page.data) || [];
 
   const handleFuelSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -234,7 +288,7 @@ export function FinanceClient({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {initialFuelLogs.map((log) => (
+            {displayFuelLogs.map((log: any) => (
               <TableRow key={log.id} className="border-none">
                 <TableCell className="py-4">{log.vehicleName}</TableCell>
                 <TableCell className="py-4">{new Date(log.loggedDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</TableCell>
@@ -242,7 +296,7 @@ export function FinanceClient({
                 <TableCell className="py-4 text-right">{Number(log.cost).toLocaleString()}</TableCell>
               </TableRow>
             ))}
-            {initialFuelLogs.length === 0 && (
+            {displayFuelLogs.length === 0 && (
               <TableRow>
                 <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
                   No fuel logs found.
@@ -251,6 +305,9 @@ export function FinanceClient({
             )}
           </TableBody>
         </Table>
+        <div ref={fuelLoadMoreRef} className="h-4 w-full flex items-center justify-center py-2">
+          {isFetchingNextFuelPage && <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -269,7 +326,7 @@ export function FinanceClient({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {initialExpenses.map((log) => (
+            {displayExpenses.map((log: any) => (
               <TableRow key={log.id} className="border-none">
                 <TableCell className="py-4">{log.tripNumber?.substring(0, 8).toUpperCase() || "-"}</TableCell>
                 <TableCell className="py-4">{log.vehicleName || "-"}</TableCell>
@@ -283,7 +340,7 @@ export function FinanceClient({
                 </TableCell>
               </TableRow>
             ))}
-            {initialExpenses.length === 0 && (
+            {displayExpenses.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                   No expenses found.
@@ -292,6 +349,9 @@ export function FinanceClient({
             )}
           </TableBody>
         </Table>
+        <div ref={expenseLoadMoreRef} className="h-4 w-full flex items-center justify-center py-2">
+          {isFetchingNextExpensePage && <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
+        </div>
 
         <div className="flex items-center justify-between border-t border-b py-4 mt-6">
           <span className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">

@@ -70,7 +70,13 @@ export async function updateDriverStatus(id: string, status: "available" | "on_t
   return { success: true, data: row };
 }
 
-export async function listDrivers() {
+export async function listDrivers({ pageParam = 0 }: { pageParam?: number } = {}) {
   await requirePermission("driver:read");
-  return db.select().from(drivers).orderBy(drivers.createdAt);
+  const limit = 10;
+  const offset = pageParam * limit;
+  const data = await db.select().from(drivers).orderBy(drivers.createdAt).limit(limit).offset(offset);
+  return {
+    data,
+    nextPage: data.length === limit ? pageParam + 1 : undefined,
+  };
 }

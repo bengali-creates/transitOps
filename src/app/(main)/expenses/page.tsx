@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getExpenses } from "@/server/actions/expenses";
-import { listVehicles } from "@/server/actions/vehicles";
 import { ExpensesClient } from "./expenses-client";
 
 export default async function ExpensesPage() {
@@ -17,13 +16,11 @@ export default async function ExpensesPage() {
     redirect("/");
   }
 
-  const logs = await getExpenses();
-  const vehicles = await listVehicles();
   const canWrite = can(role, "finance:write");
 
   return (
     <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto w-full">
-      <ExpensesClient initialLogs={logs} vehicles={vehicles} canWrite={canWrite} />
+      <ExpensesClient canWrite={canWrite} />
     </div>
   );
 }

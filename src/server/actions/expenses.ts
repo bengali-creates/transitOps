@@ -25,10 +25,12 @@ export async function createExpense(data: unknown) {
   revalidatePath("/analytics");
 }
 
-export async function getExpenses() {
+export async function getExpenses({ pageParam = 0 }: { pageParam?: number } = {}) {
   await requirePermission("finance:read");
+  const limit = 10;
+  const offset = pageParam * limit;
 
-  const logs = await db
+  const data = await db
     .select({
       id: expenses.id,
       type: expenses.type,
@@ -36,12 +38,17 @@ export async function getExpenses() {
       description: expenses.description,
       incurredDate: expenses.incurredDate,
       vehicleName: vehicles.registrationNumber,
-      tripNumber: trips.id, // Displaying trip ID, or maybe we just want string
+      tripNumber: trips.id, 
     })
     .from(expenses)
     .leftJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
     .leftJoin(trips, eq(expenses.tripId, trips.id))
-    .orderBy(desc(expenses.incurredDate));
+    .orderBy(desc(expenses.incurredDate))
+    .limit(limit)
+    .offset(offset);
 
-  return logs;
+  return {
+    data,
+    nextPage: data.length === limit ? pageParam + 1 : undefined,
+  };
 }

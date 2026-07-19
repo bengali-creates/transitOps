@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Plus, Navigation, Truck, User, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -9,20 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { createTrip, dispatchTripAction, completeTripAction, cancelTripAction } from "@/server/actions/trips";
+import { createTrip, dispatchTripAction, completeTripAction, cancelTripAction, listTrips } from "@/server/actions/trips";
+import { listVehicles } from "@/server/actions/vehicles";
+import { listDrivers } from "@/server/actions/drivers";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
-type Trip = any; // Will use inferred types from page.tsx in practice, but keeping simple here.
+type Trip = any;
 type Vehicle = any;
 type Driver = any;
 
-interface TripClientProps {
-  initialTrips: Trip[];
-  vehicles: Vehicle[];
-  drivers: Driver[];
-}
-
-export function TripClient({ initialTrips, vehicles, drivers }: TripClientProps) {
-  const [trips, setTrips] = useState(initialTrips);
+export function TripClient() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestionReason, setSuggestionReason] = useState("");
@@ -34,11 +30,44 @@ export function TripClient({ initialTrips, vehicles, drivers }: TripClientProps)
   const [driverId, setDriverId] = useState("");
   const [cargoWeight, setCargoWeight] = useState("");
   const [plannedDistance, setPlannedDistance] = useState("");
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  const availableVehicles = vehicles.filter(v => v.status === "available");
-  const availableDrivers = drivers.filter(d => d.status === "available");
+  const { data: vehiclesData } = useQuery({
+    queryKey: ["vehicles-list"],
+    queryFn: () => listVehicles({ pageParam: 0 }),
+  });
+  const vehicles = vehiclesData?.data || [];
 
-  const selectedVehicle = vehicles.find(v => v.id === vehicleId);
+  const { data: driversData } = useQuery({
+    queryKey: ["drivers-list"],
+    queryFn: () => listDrivers({ pageParam: 0 }),
+  });
+  const drivers = driversData?.data || [];
+
+  const { data: tripsData, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ["trips-logs"],
+    queryFn: async ({ pageParam = 0 }) => listTrips({ pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage: any) => lastPage.nextPage,
+  });
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    }, { root: null, rootMargin: "20px", threshold: 1.0 });
+
+    if (loadMoreRef.current) observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasNextPage, fetchNextPage, isFetchingNextPage]);
+
+  const displayTrips = tripsData?.pages.flatMap((page) => page.data) || [];
+
+  const availableVehicles = vehicles.filter((v: any) => v.status === "available");
+  const availableDrivers = drivers.filter((d: any) => d.status === "available");
+
+  const selectedVehicle = vehicles.find((v: any) => v.id === vehicleId);
   const weight = Number(cargoWeight);
   const capacity = selectedVehicle ? Number(selectedVehicle.maxLoadCapacity) : 0;
   
@@ -128,7 +157,7 @@ export function TripClient({ initialTrips, vehicles, drivers }: TripClientProps)
       <div className="w-full lg:w-[450px] shrink-0 space-y-6">
         
         {/* LIFECYCLE */}
-        <div>
+        {/* <div>
           <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Trip Lifecycle</h3>
           <div className="flex items-center justify-between relative">
             <div className="absolute left-4 right-4 top-[7px] h-[3px] bg-muted/50"></div>
@@ -146,12 +175,12 @@ export function TripClient({ initialTrips, vehicles, drivers }: TripClientProps)
               );
             })}
           </div>
-        </div>
+        </div> */}
 
         {/* CREATE TRIP FORM */}
         <div>
           <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Create Trip</h3>
-          <form onSubmit={handleCreateAndDispatch} className="space-y-4">
+          <form onSubmit={handleCreateAndDispatch} className="space-y-2">
             <div className="space-y-2">
               <Label className="text-xs uppercase text-muted-foreground">Source</Label>
               <Input placeholder="e.g. Gandhinagar Depot" value={source} onChange={e => setSource(e.target.value)} required className="w-full bg-background" />
@@ -245,11 +274,11 @@ export function TripClient({ initialTrips, vehicles, drivers }: TripClientProps)
       </div>
 
       {/* RIGHT COLUMN: LIVE BOARD */}
-      <div className="flex-1 space-y-4">
+      <div className="flex-1 space-y-4 overflow-y-auto h-[80vh]">
         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Live Board</h3>
         
         <div className="grid gap-4">
-          {initialTrips.map(trip => (
+          {displayTrips.map((trip: any) => (
             <Card key={trip.id} className="bg-card/50 hover:bg-card transition-colors border-dashed">
               <CardContent className="p-4 flex flex-col sm:flex-row justify-between gap-4">
                 <div className="space-y-3 flex-1">
@@ -278,11 +307,15 @@ export function TripClient({ initialTrips, vehicles, drivers }: TripClientProps)
             </Card>
           ))}
           
-          {initialTrips.length === 0 && (
+          {displayTrips.length === 0 && (
             <div className="text-center p-8 border border-dashed rounded-lg text-muted-foreground">
               No trips found. Create one to get started.
             </div>
           )}
+
+          <div ref={loadMoreRef} className="h-4 w-full flex items-center justify-center py-2">
+            {isFetchingNextPage && <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
+          </div>
         </div>
         
         <div className="text-xs text-muted-foreground pt-8">

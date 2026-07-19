@@ -38,10 +38,18 @@ export async function finishMaintenance(id: string) {
   }
 }
 
-export async function listMaintenanceLogs() {
+export async function listMaintenanceLogs({pageParam=0}: {pageParam?: number}) {
   await requirePermission("maintenance:read");
-  return db.query.maintenanceLogs.findMany({
+  const limit=10;
+  const offset=pageParam*limit;
+  const data = await db.query.maintenanceLogs.findMany({
     with: { vehicle: true },
     orderBy: [desc(maintenanceLogs.createdAt)],
+    limit,
+    offset,
   });
+  return {
+    data,
+    nextPage: data.length === limit ? pageParam + 1 : undefined,
+  };
 }

@@ -25,10 +25,12 @@ export async function createFuelLog(data: unknown) {
   revalidatePath("/analytics");
 }
 
-export async function getFuelLogs() {
+export async function getFuelLogs({ pageParam = 0 }: { pageParam?: number } = {}) {
   await requirePermission("finance:read");
+  const limit = 10;
+  const offset = pageParam * limit;
 
-  const logs = await db
+  const data = await db
     .select({
       id: fuelLogs.id,
       liters: fuelLogs.liters,
@@ -38,7 +40,12 @@ export async function getFuelLogs() {
     })
     .from(fuelLogs)
     .leftJoin(vehicles, eq(fuelLogs.vehicleId, vehicles.id))
-    .orderBy(desc(fuelLogs.loggedDate));
+    .orderBy(desc(fuelLogs.loggedDate))
+    .limit(limit)
+    .offset(offset);
 
-  return logs;
+  return {
+    data,
+    nextPage: data.length === limit ? pageParam + 1 : undefined,
+  };
 }

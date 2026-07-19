@@ -85,7 +85,12 @@ export async function retireVehicle(id: string) {
   revalidatePath("/vehicles");
 }
 
-export async function listVehicles() {
+export async function listVehicles({pageParam=0,filter}:{pageParam?:number,filter?:string} = {}){
   await requirePermission("vehicle:read");
-  return db.select().from(vehicles).orderBy(vehicles.createdAt);
-}
+  const limit=10;
+  const offset=pageParam*limit;
+  const data=await db.select().from(vehicles).orderBy(vehicles.createdAt).limit(limit).offset(offset);
+  return {
+    data,
+    nextPage:data.length===limit?pageParam+1:undefined,
+  }}

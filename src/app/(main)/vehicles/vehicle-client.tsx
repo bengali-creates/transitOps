@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { PlusIcon, PencilIcon, BanIcon } from "lucide-react";
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
@@ -15,14 +15,35 @@ import {
 import { 
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select";
-import { createVehicle, updateVehicle, retireVehicle } from "@/server/actions/vehicles";
+import { createVehicle, updateVehicle, retireVehicle, listVehicles } from "@/server/actions/vehicles";
 import { toast } from "sonner";
+import { useInfiniteQuery } from "@tanstack/react-query";
 
-export function VehicleClient({ initialVehicles, canWrite }: { initialVehicles: any[], canWrite: boolean }) {
-  const [vehicles, setVehicles] = useState(initialVehicles);
+export function VehicleClient({ canWrite }: { canWrite: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<any | null>(null);
   const [isPending, startTransition] = useTransition();
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ["vehicles-infinite"],
+    queryFn: async ({ pageParam = 0 }) => listVehicles({ pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage: any) => lastPage.nextPage,
+  });
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    }, { root: null, rootMargin: "20px", threshold: 1.0 });
+
+    if (loadMoreRef.current) observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasNextPage, fetchNextPage, isFetchingNextPage]);
+
+  const vehicles = data?.pages.flatMap((page) => page.data) || [];
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -183,7 +204,7 @@ export function VehicleClient({ initialVehicles, canWrite }: { initialVehicles: 
         )}
       </div>
 
-      <div className="rounded-md border bg-card w-full overflow-x-auto">
+      <div className="rounded-md border bg-card w-full overflow-x-auto overflow-y-auto h-[60vh]">
         <Table className="min-w-[600px]">
           <TableHeader>
             <TableRow>
@@ -234,6 +255,9 @@ export function VehicleClient({ initialVehicles, canWrite }: { initialVehicles: 
             )}
           </TableBody>
         </Table>
+        <div ref={loadMoreRef} className="h-4 w-full flex items-center justify-center py-4">
+          {isFetchingNextPage && <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
+        </div>
       </div>
     </div>
   );

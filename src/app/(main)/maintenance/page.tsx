@@ -18,16 +18,12 @@ export default async function MaintenancePage() {
     redirect("/dashboard");
   }
 
-  const logs = await listMaintenanceLogs();
-  const vehicles = await listVehicles();
   const canWrite = can(role, "maintenance:write");
 
   return (
     <div className="flex h-full w-full flex-col">
       <main className="flex-1 space-y-4 p-4 md:p-8 pt-6">
         <MaintenanceClient 
-          initialLogs={logs} 
-          vehicles={vehicles}
           canWrite={canWrite} 
         />
       </main>
