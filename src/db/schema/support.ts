@@ -103,3 +103,16 @@ export const settings = pgTable("settings", {
     .notNull()
     .defaultNow(),
 });
+
+/**
+ * Assistant conversations to maintain multi-turn chat history.
+ */
+export const conversations = pgTable("conversations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  title: text("title"),
+  messages: jsonb("messages").default([]).notNull(), // Array of { role, content, intent, data_summary, actions, timestamp }
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
