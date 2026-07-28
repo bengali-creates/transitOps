@@ -8,9 +8,7 @@ import {
   Map,
   Wrench,
   Fuel,
-  CreditCard,
   PieChart,
-  Bot,
   LogOut,
   Grid,
   Settings,
@@ -42,7 +40,6 @@ const navItems = [
   { title: "Maintenance", url: "/maintenance", icon: Wrench, permission: "maintenance:read" as const },
   { title: "Fuel & Expenses", url: "/finance", icon: Fuel, permission: "finance:read" as const },
   { title: "Analytics", url: "/analytics", icon: PieChart, permission: "reports:read" as const },
-  { title: "Assistant", url: "/assistant", icon: Bot, permission: "ai:use" as const },
   { title: "Settings", url: "/settings", icon: Settings, permission: null },
 ];
 
