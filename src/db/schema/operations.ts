@@ -147,3 +147,48 @@ export const expensesRelations = relations(expenses, ({ one }) => ({
     references: [trips.id],
   }),
 }));
+
+export const depots = pgTable("depots", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull().unique(),
+  region: text("region").notNull(),
+  latitude: numeric("latitude", { precision: 10, scale: 6 }).notNull(),
+  longitude: numeric("longitude", { precision: 10, scale: 6 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const depotEdges = pgTable("depot_edges", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  fromDepotId: uuid("from_depot_id")
+    .notNull()
+    .references(() => depots.id, { onDelete: "cascade" }),
+  toDepotId: uuid("to_depot_id")
+    .notNull()
+    .references(() => depots.id, { onDelete: "cascade" }),
+  distanceKm: numeric("distance_km", { precision: 10, scale: 2 }).notNull(),
+  tollCost: numeric("toll_cost", { precision: 10, scale: 2 }).default("0.00"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const depotsRelations = relations(depots, ({ many }) => ({
+  outgoingEdges: many(depotEdges, { relationName: "outgoing" }),
+  incomingEdges: many(depotEdges, { relationName: "incoming" }),
+}));
+
+export const depotEdgesRelations = relations(depotEdges, ({ one }) => ({
+  fromDepot: one(depots, {
+    fields: [depotEdges.fromDepotId],
+    references: [depots.id],
+    relationName: "outgoing",
+  }),
+  toDepot: one(depots, {
+    fields: [depotEdges.toDepotId],
+    references: [depots.id],
+    relationName: "incoming",
+  }),
+}));
+

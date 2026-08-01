@@ -77,3 +77,24 @@ export const expenseSchema = z.object({
 export type VehicleInput = z.infer<typeof vehicleSchema>;
 export type DriverInput = z.infer<typeof driverSchema>;
 export type TripCreateInput = z.infer<typeof tripCreateSchema>;
+
+export const depotSchema = z.object({
+  name: z.string().min(1),
+  region: z.string().min(1),
+  latitude: z.coerce.number().min(-90).max(90),
+  longitude: z.coerce.number().min(-180).max(180),
+});
+
+export const depotEdgeSchema = z.object({
+  fromDepotId: z.string().uuid(),
+  toDepotId: z.string().uuid(),
+  distanceKm: z.coerce.number().positive(),
+  tollCost: z.coerce.number().min(0).default(0),
+});
+
+export const estimateTripSchema = z.object({
+  originId: z.string().uuid(),
+  destinationId: z.string().uuid(),
+  vehicleType: z.string().min(1),
+});
+
