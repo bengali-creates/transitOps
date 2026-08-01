@@ -13,6 +13,7 @@ import { createTrip, dispatchTripAction, completeTripAction, cancelTripAction, l
 import { listVehicles } from "@/server/actions/vehicles";
 import { listDrivers } from "@/server/actions/drivers";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { AgentPlanPanel } from "@/components/agent-plan-panel";
 
 type Trip = any;
 type Vehicle = any;
@@ -223,10 +224,11 @@ export function TripClient() {
               </Select>
             </div>
 
-            <div className="flex justify-between items-center py-2">
+            <div className="flex flex-col gap-2 py-2">
               <Button type="button" variant="secondary" size="sm" onClick={handleSuggestMatch} disabled={isSuggesting || !cargoWeight || !destination} className="w-full bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20 border-indigo-500/20 border border-dashed">
                 {isSuggesting ? "Analyzing fleet..." : "✨ Suggest Best Match"}
               </Button>
+              <AgentPlanPanel />
             </div>
             
             {suggestionReason && (
