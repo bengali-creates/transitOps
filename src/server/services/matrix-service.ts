@@ -1,11 +1,10 @@
 import { db } from "@/db";
 import { depots, depotEdges } from "@/db/schema";
-import { randomUUID } from "crypto";
 
 // ─── Simple LRU Cache Implementation ─────────────────────────────────────────
 class SimpleLRUCache<K, V> {
   private cache = new Map<K, V>();
-  constructor(private max: number = 10) {}
+  constructor(private max: number = 100) {} // Capacity 100 for individual routes
 
   get(key: K): V | undefined {
     if (!this.cache.has(key)) return undefined;
@@ -32,10 +31,20 @@ class SimpleLRUCache<K, V> {
   }
 }
 
-const matrixCache = new SimpleLRUCache<string, PrecomputedMatrix>(5);
+interface PrecomputedRoute {
+  reachable: boolean;
+  distanceKm: number;
+  estimatedFuelLiters: number;
+  estimatedCost: number;
+  path: string[];
+  tollCost: number;
+  geometry: [number, number][];
+}
 
-let currentGraphVersion = randomUUID();
+// Cache mapped by individual routes: originId_destinationId_vehicleType
+const matrixCache = new SimpleLRUCache<string, PrecomputedRoute>(100);
 
+// Fuel rates per kilometer based on vehicle type
 const FUEL_RATES: Record<string, number> = {
   "Truck": 0.35,
   "Mini Truck": 0.20,
@@ -44,90 +53,9 @@ const FUEL_RATES: Record<string, number> = {
   "default": 0.25,
 };
 
-const FUEL_PRICE_PER_LITER = 96.7; // Rs per Liter GJ
-
-interface PrecomputedMatrix {
-  distances: number[][];
-  nextNodes: (number | null)[][];
-  tollCosts: number[][];
-  indexToId: string[];
-  idToIndex: Map<string, number>;
-  graphVersion: string;
-}
-
-
-export async function getMatrix(): Promise<PrecomputedMatrix> {
-  const cached = matrixCache.get(currentGraphVersion);
-  if (cached) {
-    return cached;
-  }
-
-  const allDepots = await db.select().from(depots);
-  const allEdges = await db.select().from(depotEdges);
-
-  const indexToId = allDepots.map((d) => d.id);
-  const idToIndex = new Map<string, number>();
-  indexToId.forEach((id, index) => idToIndex.set(id, index));
-
-  const n = allDepots.length;
-
-  const distances: number[][] = Array.from({ length: n }, () =>
-    Array(n).fill(Infinity)
-  );
-  const nextNodes: (number | null)[][] = Array.from({ length: n }, () =>
-    Array(n).fill(null)
-  );
-  const tollCosts: number[][] = Array.from({ length: n }, () =>
-    Array(n).fill(0)
-  );
-
-  for (let i = 0; i < n; i++) {
-    distances[i][i] = 0;
-  }
-
-  for (const edge of allEdges) {
-    const u = idToIndex.get(edge.fromDepotId);
-    const v = idToIndex.get(edge.toDepotId);
-    if (u !== undefined && v !== undefined) {
-      const dist = Number(edge.distanceKm);
-      const toll = Number(edge.tollCost || 0);
-
-      if (dist < distances[u][v]) {
-        distances[u][v] = dist;
-        nextNodes[u][v] = v;
-        tollCosts[u][v] = toll;
-      }
-    }
-  }
-
-  for (let k = 0; k < n; k++) {
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j < n; j++) {
-        if (distances[i][k] + distances[k][j] < distances[i][j]) {
-          distances[i][j] = distances[i][k] + distances[k][j];
-          nextNodes[i][j] = nextNodes[i][k];
-          tollCosts[i][j] = tollCosts[i][k] + tollCosts[k][j];
-        }
-      }
-    }
-  }
-
-  const precomputed: PrecomputedMatrix = {
-    distances,
-    nextNodes,
-    tollCosts,
-    indexToId,
-    idToIndex,
-    graphVersion: currentGraphVersion,
-  };
-
-  matrixCache.set(currentGraphVersion, precomputed);
-  return precomputed;
-}
-
+const FUEL_PRICE_PER_LITER = 96.7;
 
 export function invalidateCache() {
-  currentGraphVersion = randomUUID();
   matrixCache.clear();
 }
 
@@ -135,52 +63,238 @@ export async function estimateTrip(
   originId: string,
   destinationId: string,
   vehicleType: string
-) {
-  const matrix = await getMatrix();
-  const u = matrix.idToIndex.get(originId);
-  const v = matrix.idToIndex.get(destinationId);
-
-  if (u === undefined || v === undefined) {
-    throw new Error("Origin or destination depot not found in matrix");
+): Promise<PrecomputedRoute> {
+  const cacheKey = `${originId}_${destinationId}_${vehicleType}`;
+  const cached = matrixCache.get(cacheKey);
+  if (cached) {
+    return cached;
   }
 
-  const distance = matrix.distances[u][v];
-  if (distance === Infinity) {
-    return {
+  // Run Dijkstra pathfinder dynamically
+  const detourResult = await getDetourRoutes(originId, destinationId, []);
+
+  if (!detourResult.reachable) {
+    const result: PrecomputedRoute = {
       reachable: false,
       distanceKm: 0,
       estimatedFuelLiters: 0,
       estimatedCost: 0,
       path: [],
       tollCost: 0,
+      geometry: [],
     };
+    matrixCache.set(cacheKey, result);
+    return result;
   }
 
-  // Reconstruct path
-  const path: string[] = [];
-  let curr: number | null = u;
-  path.push(matrix.indexToId[curr]);
+  // Calculate fuel & cost metrics dynamically
+  const fuelRate = FUEL_RATES[vehicleType] ?? FUEL_RATES["default"];
+  const estimatedFuel = detourResult.distanceKm * fuelRate;
+  const fuelCost = estimatedFuel * FUEL_PRICE_PER_LITER;
+  const totalCost = fuelCost + detourResult.tollCost;
 
-  while (curr !== v && curr !== null) {
-    curr = matrix.nextNodes[curr][v];
-    if (curr !== null) {
-      path.push(matrix.indexToId[curr]);
+  const result: PrecomputedRoute = {
+    reachable: true,
+    distanceKm: detourResult.distanceKm,
+    estimatedFuelLiters: Number(estimatedFuel.toFixed(2)),
+    estimatedCost: Number(totalCost.toFixed(2)),
+    path: detourResult.path,
+    tollCost: detourResult.tollCost,
+    geometry: detourResult.geometry as [number, number][],
+  };
+
+  matrixCache.set(cacheKey, result);
+  return result;
+}
+
+export function calculateHaversineDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos((lat1 * Math.PI) / 180) *Math.cos((lat2 * Math.PI) / 180) *Math.sin(dLon / 2) *Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Number((R * c).toFixed(2));
+}
+
+/**
+ * Resolves true road distance and geometry coordinates from OpenRouteService,
+ * with a fallback to the Haversine formula and straight-line geometry.
+ */
+export async function getRouteDistanceAndGeometry(
+  fromLat: number,
+  fromLon: number,
+  toLat: number,
+  toLon: number
+): Promise<{ distanceKm: number; geometry: string }> {
+  const apiKey = process.env.ORS_API_KEY;
+  if (apiKey) {
+    try {
+      const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${apiKey}&start=${fromLon},${fromLat}&end=${toLon},${toLat}`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        const route = data.features?.[0];
+        if (route) {
+          const distanceKm = Number(
+            (route.properties.summary.distance / 1000).toFixed(2)
+          );
+          const coords = route.geometry.coordinates.map(
+            (pt: [number, number]) => [pt[1], pt[0]]
+          );
+          return {
+            distanceKm,
+            geometry: JSON.stringify(coords),
+          };
+        }
+      }
+    } catch (e) {
+      console.warn(
+        "Failed to fetch route from OpenRouteService, falling back to Haversine:",
+        e
+      );
     }
   }
 
-  // Calculate fuel & cost
-  const fuelRate = FUEL_RATES[vehicleType] ?? FUEL_RATES["default"];
-  const estimatedFuel = distance * fuelRate;
-  const toll = matrix.tollCosts[u][v];
-  const fuelCost = estimatedFuel * FUEL_PRICE_PER_LITER;
-  const totalCost = fuelCost + toll;
+const distanceKm = calculateHaversineDistance(
+    fromLat,
+    fromLon,
+    toLat,
+    toLon
+  );
+  const geometry = JSON.stringify([
+    [fromLat, fromLon],
+    [toLat, toLon],
+  ]);
+  return { distanceKm, geometry };
+}
+
+interface EdgeInfo {
+  to: number;
+  distance: number;
+  toll: number;
+  geometry: string | null;
+  edgeId: string;
+}
+
+export async function getDetourRoutes(
+  originId: string,
+  destinationId: string,
+  blockedEdgeIds: string[] = []
+) {
+  const allDepots = await db.select().from(depots);
+  const allEdges = await db.select().from(depotEdges);
+
+  const n = allDepots.length;
+  const indexToId = allDepots.map((d) => d.id);
+  const idToIndex = new Map<string, number>();
+  indexToId.forEach((id, index) => idToIndex.set(id, index));
+
+  const u = idToIndex.get(originId);
+  const v = idToIndex.get(destinationId);
+  if (u === undefined || v === undefined) {
+    throw new Error("Origin or destination not found in graph");
+  }
+
+  const adjList: EdgeInfo[][] = Array.from({ length: n }, () => []);
+  for (const edge of allEdges) {
+    if (blockedEdgeIds.includes(edge.id)) {
+      continue;
+    }
+    const fromIdx = idToIndex.get(edge.fromDepotId);
+    const toIdx = idToIndex.get(edge.toDepotId);
+    if (fromIdx !== undefined && toIdx !== undefined) {
+      adjList[fromIdx].push({
+        to: toIdx,
+        distance: Number(edge.distanceKm),
+        toll: Number(edge.tollCost || 0),
+        geometry: edge.geometry,
+        edgeId: edge.id,
+      });
+    }
+  }
+
+  const dist = Array(n).fill(Infinity);
+  const prev = Array(n).fill(null);
+  const prevEdgeGeometry = Array(n).fill(null);
+  const toll = Array(n).fill(0);
+
+  dist[u] = 0;
+  const visited = Array(n).fill(false);
+
+  for (let step = 0; step < n; step++) {
+    let minDist = Infinity;
+    let curr = -1;
+    for (let i = 0; i < n; i++) {
+      if (!visited[i] && dist[i] < minDist) {
+        minDist = dist[i];
+        curr = i;
+      }
+    }
+
+    if (curr === -1 || curr === v) break;
+    visited[curr] = true;
+
+    for (const neighbor of adjList[curr]) {
+      if (dist[curr] + neighbor.distance < dist[neighbor.to]) {
+        dist[neighbor.to] = dist[curr] + neighbor.distance;
+        prev[neighbor.to] = curr;
+        prevEdgeGeometry[neighbor.to] = neighbor.geometry;
+        toll[neighbor.to] = toll[curr] + neighbor.toll;
+      }
+    }
+  }
+
+  if (dist[v] === Infinity) {
+    return { reachable: false, distanceKm: 0, path: [], geometry: [] };
+  }
+
+  const pathIdx: number[] = [];
+  let currNode = v;
+  while (currNode !== null) {
+    pathIdx.push(currNode);
+    currNode = prev[currNode];
+  }
+  pathIdx.reverse();
+
+  const path = pathIdx.map((idx) => indexToId[idx]);
+
+  const fullGeometry: [number, number][] = [];
+  for (let i = 0; i < pathIdx.length - 1; i++) {
+    const nextNode = pathIdx[i + 1];
+    const geomStr = prevEdgeGeometry[nextNode];
+    if (geomStr) {
+      try {
+        const coords = JSON.parse(geomStr);
+        fullGeometry.push(...coords);
+      } catch (e) {
+        const fromDepot = allDepots[pathIdx[i]];
+        const toDepot = allDepots[nextNode];
+        fullGeometry.push(
+          [Number(fromDepot.latitude), Number(fromDepot.longitude)],
+          [Number(toDepot.latitude), Number(toDepot.longitude)]
+        );
+      }
+    } else {
+      const fromDepot = allDepots[pathIdx[i]];
+      const toDepot = allDepots[nextNode];
+      fullGeometry.push(
+        [Number(fromDepot.latitude), Number(fromDepot.longitude)],
+        [Number(toDepot.latitude), Number(toDepot.longitude)]
+      );
+    }
+  }
 
   return {
     reachable: true,
-    distanceKm: distance,
-    estimatedFuelLiters: Number(estimatedFuel.toFixed(2)),
-    estimatedCost: Number(totalCost.toFixed(2)),
+    distanceKm: Number(dist[v].toFixed(2)),
+    tollCost: Number(toll[v].toFixed(2)),
     path,
-    tollCost: toll,
+    geometry: fullGeometry,
   };
 }
+

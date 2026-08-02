@@ -3,7 +3,7 @@
 import { db } from "@/db";
 import { depots, depotEdges } from "@/db/schema";
 import { depotSchema, depotEdgeSchema } from "@/lib/validations";
-import { invalidateCache } from "@/server/services/matrix-service";
+import { invalidateCache, getRouteDistanceAndGeometry } from "@/server/services/matrix-service";
 import { eq } from "drizzle-orm";
 
 export async function createDepot(formData: FormData) {
@@ -27,8 +27,6 @@ export async function createDepot(formData: FormData) {
       })
       .returning();
 
-    invalidateCache();
-
     return { success: true, depot: newDepot };
   } catch (error: any) {
     console.error("Failed to create depot:", error);
@@ -41,23 +39,45 @@ export async function createEdge(formData: FormData) {
     const rawData = {
       fromDepotId: formData.get("fromDepotId"),
       toDepotId: formData.get("toDepotId"),
-      distanceKm: formData.get("distanceKm"),
+      distanceKm: formData.get("distanceKm") || null,
       tollCost: formData.get("tollCost") || 0,
     };
 
     const parsed = depotEdgeSchema.parse(rawData);
+
+    const [fromDepot] = await db
+      .select()
+      .from(depots)
+      .where(eq(depots.id, parsed.fromDepotId));
+    const [toDepot] = await db
+      .select()
+      .from(depots)
+      .where(eq(depots.id, parsed.toDepotId));
+
+    if (!fromDepot || !toDepot) {
+      throw new Error("Source or destination depot not found.");
+    }
+
+    const { distanceKm, geometry } = await getRouteDistanceAndGeometry(
+      Number(fromDepot.latitude),
+      Number(fromDepot.longitude),
+      Number(toDepot.latitude),
+      Number(toDepot.longitude)
+    );
+
+    const finalDistance = parsed.distanceKm ?? distanceKm;
 
     const [newEdge] = await db
       .insert(depotEdges)
       .values({
         fromDepotId: parsed.fromDepotId,
         toDepotId: parsed.toDepotId,
-        distanceKm: String(parsed.distanceKm),
+        distanceKm: String(finalDistance),
         tollCost: String(parsed.tollCost),
+        geometry,
       })
       .returning();
 
-    invalidateCache();
 
     return { success: true, edge: newEdge };
   } catch (error: any) {
@@ -70,8 +90,6 @@ export async function deleteEdge(edgeId: string) {
   try {
     await db.delete(depotEdges).where(eq(depotEdges.id, edgeId));
 
-    // Cache invalidation step: Bumps internal matrix hash
-    invalidateCache();
 
     return { success: true };
   } catch (error: any) {
