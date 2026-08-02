@@ -169,6 +169,7 @@ export const depotEdges = pgTable("depot_edges", {
     .references(() => depots.id, { onDelete: "cascade" }),
   distanceKm: numeric("distance_km", { precision: 10, scale: 2 }).notNull(),
   tollCost: numeric("toll_cost", { precision: 10, scale: 2 }).default("0.00"),
+  geometry: text("geometry"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

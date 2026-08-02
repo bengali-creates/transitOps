@@ -88,7 +88,7 @@ export const depotSchema = z.object({
 export const depotEdgeSchema = z.object({
   fromDepotId: z.string().uuid(),
   toDepotId: z.string().uuid(),
-  distanceKm: z.coerce.number().positive(),
+  distanceKm: z.coerce.number().positive().optional().nullable(),
   tollCost: z.coerce.number().min(0).default(0),
 });
 

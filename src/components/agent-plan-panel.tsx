@@ -11,6 +11,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { dispatchTripAction } from "@/server/actions/trips";
+import dynamic from "next/dynamic";
+
+const RouteMap = dynamic(() => import("@/components/route-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[250px] w-full rounded-lg border bg-muted/40 animate-pulse flex items-center justify-center text-muted-foreground text-xs font-medium">
+      Loading route overview map...
+    </div>
+  ),
+});
 
 interface StepTrace {
   role: string;
@@ -29,6 +39,31 @@ export function AgentPlanPanel() {
   const [finalPlan, setFinalPlan] = React.useState<string | null>(null);
   const [draftTripId, setDraftTripId] = React.useState<string | null>(null);
   const [confidence, setConfidence] = React.useState<number | null>(null);
+
+  // Extract geometries from step trace messages
+  const routeGeometries = React.useMemo(() => {
+    let primaryGeom: [number, number][] = [];
+    let alternateGeom: [number, number][] = [];
+
+    steps.forEach((step) => {
+      if (step.role === "tool") {
+        try {
+          const parsed = JSON.parse(step.content);
+          if (parsed?.reachable && Array.isArray(parsed?.geometry)) {
+            if (step.name === "get_alternate_route") {
+              alternateGeom = parsed.geometry;
+            } else if (step.name === "estimate_route") {
+              primaryGeom = parsed.geometry;
+            }
+          }
+        } catch (e) {
+          // Ignore parse errors for text-based tool feedback
+        }
+      }
+    });
+
+    return { primaryGeom, alternateGeom };
+  }, [steps]);
 
   const { mutate: generatePlan, isPending } = useMutation({
     mutationFn: async () => {
@@ -206,6 +241,24 @@ export function AgentPlanPanel() {
                 <Check className="w-4 h-4" />
                 <span>Recommended Dispatch Plan</span>
               </h4>
+              
+              {/* Route Map Render */}
+              {(routeGeometries.primaryGeom.length > 0 || routeGeometries.alternateGeom.length > 0) && (
+                <div className="my-3 overflow-hidden rounded-lg border border-emerald-500/10">
+                  <RouteMap
+                    primaryPathGeometry={routeGeometries.primaryGeom}
+                    alternatePathGeometry={routeGeometries.alternateGeom}
+                    height="240px"
+                  />
+                  {routeGeometries.alternateGeom.length > 0 && (
+                    <div className="bg-fuchsia-500/10 text-fuchsia-700 text-[10px] px-3 py-1.5 border-t border-fuchsia-500/10 font-medium flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-fuchsia-500" />
+                      <span>Route detour calculated (Dashed fuchsia polyline) to bypass roadblock.</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground font-sans">
                 {finalPlan}
               </p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { updateSettings } from "@/server/actions/settings";
 import { createDepot, createEdge, deleteEdge, listDepots, listEdges } from "@/server/actions/depots";
@@ -18,6 +19,15 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Check, Trash2, Plus, Route, Warehouse, Shield, Settings } from "lucide-react";
+
+const RouteMap = dynamic(() => import("@/components/route-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[400px] w-full rounded-lg border bg-muted/40 animate-pulse flex items-center justify-center text-muted-foreground text-sm font-medium">
+      Loading transit route map...
+    </div>
+  ),
+});
 
 const RBAC_DATA = [
   { role: "Fleet Manager", fleet: "✓", drivers: "✓", trips: "-", fuelExp: "-", analytics: "✓" },
@@ -203,6 +213,34 @@ export function SettingsClient({ initialSettings, userRole }: { initialSettings:
 
         {/* Tab 3: Depot & Route Management */}
         <TabsContent value="depots" className="space-y-6">
+          {/* Visual Route Map */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium uppercase text-muted-foreground tracking-wider">Transit Network Map</h3>
+            <RouteMap
+              depots={depotsList}
+              connections={edgesList.map((edge: any) => {
+                const from = depotsList.find((d: any) => d.id === edge.fromDepotId);
+                const to = depotsList.find((d: any) => d.id === edge.toDepotId);
+                if (!from || !to) return [];
+                if (edge.geometry) {
+                  try {
+                    return JSON.parse(edge.geometry);
+                  } catch (e) {
+                    return [
+                      [Number(from.latitude), Number(from.longitude)],
+                      [Number(to.latitude), Number(to.longitude)]
+                    ];
+                  }
+                }
+                return [
+                  [Number(from.latitude), Number(from.longitude)],
+                  [Number(to.latitude), Number(to.longitude)]
+                ];
+              }).filter((c: any) => c.length > 0)}
+              height="350px"
+            />
+          </div>
+
           <div className="grid gap-6 md:grid-cols-2">
             
             {/* Create Depot */}
