@@ -222,6 +222,23 @@ def draft_trip_action(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@tool
+def retrieve_operational_policy(query: str) -> List[Dict[str, Any]]:
+    """
+    Perform a semantic search in the company's knowledge base (SOPs, cargo limits,
+    driver safety rules, handbook policies) to retrieve compliance context for verification.
+    Use this to verify weight limits, licensing, and compliance guidelines before planning.
+    """
+    url = f"{NEXTJS_URL}/api/internal/rag/retrieve"
+    params = {"q": query, "k": 3}
+    try:
+        response = httpx.get(url, params=params, timeout=10.0)
+        if response.status_code == 200:
+            return response.json()
+        return []
+    except Exception as e:
+        return [{"error": f"Failed to retrieve operational policy: {str(e)}"}]
+
 def get_agent():
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -239,23 +256,25 @@ def get_agent():
         estimate_route, 
         check_route_conditions,
         get_alternate_route,
-        draft_trip_action
+        draft_trip_action,
+        retrieve_operational_policy
     ]
     
     system_message = (
         "You are an advanced fleet operations planner agent for TransitOps.\n"
-        "Your goal is to build a safe, cost-effective dispatch plan based on a user's instruction.\n"
+        "Your goal is to build a safe, compliant, and cost-effective dispatch plan based on a user's instruction.\n"
         "To accomplish this, follow these rules strictly:\n"
-        "1. Check for eligible vehicles that can hold the cargo weight.\n"
-        "2. Check for eligible drivers.\n"
-        "3. Estimate the primary route using the estimate_route tool. This returns the path (depot IDs).\n"
-        "4. Always call check_route_conditions with the names of the depots in the estimated path.\n"
-        "5. If check_route_conditions returns any alerts with risk_level 'HIGH', identify the blocked edges.\n"
+        "1. Check the operational policy by calling retrieve_operational_policy for cargo capacities, licensing rules, and weather protocols.\n"
+        "2. Check for eligible vehicles that can hold the cargo weight, matching compliance policies.\n"
+        "3. Check for eligible drivers.\n"
+        "4. Estimate the primary route using the estimate_route tool. This returns the path (depot IDs).\n"
+        "5. Always call check_route_conditions with the names of the depots in the estimated path.\n"
+        "6. If check_route_conditions returns any alerts with risk_level 'HIGH', identify the blocked edges.\n"
         "   If an edge is blocked, you must query get_alternate_route passing the origin, destination, and the blocked edge IDs to find a detour.\n"
-        "6. If a detour path is found, use it instead of the blocked primary path.\n"
-        "7. Draft the final selected route using the draft_trip_action tool.\n"
-        "8. Formulate a final response summarizing the chosen route path, vehicle, driver, distance, estimated fuel, cost, "
-        "and draft trip ID. If alternate detour routes were selected, explain why (citing the blocked news/weather alerts).\n"
+        "7. If a detour path is found, use it instead of the blocked primary path.\n"
+        "8. Draft the final selected route using the draft_trip_action tool.\n"
+        "9. Formulate a final response summarizing the chosen route path, vehicle, driver, distance, estimated fuel, cost, "
+        "and draft trip ID. You MUST cite the specific operational guidelines (e.g. cargo_sop.txt, driver_handbook.txt) that ground your decisions.\n"
         "Never invent details. Always ground your claims strictly in the observations returned by tools."
     )
     
@@ -266,3 +285,4 @@ def get_agent():
         state_modifier=system_message
     )
     return agent
+
