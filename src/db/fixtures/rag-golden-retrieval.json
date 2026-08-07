@@ -1,0 +1,14 @@
+[
+  {
+    "query": "what is the cargo weight capacity limit",
+    "expected_sources": ["cargo_sop.txt"]
+  },
+  {
+    "query": "safety protocols for storm and fog",
+    "expected_sources": ["weather_sop.txt"]
+  },
+  {
+    "query": "licence update rules and CDL requirement",
+    "expected_sources": ["driver_handbook.txt"]
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "question": "What is the weight capacity of a Mini Truck according to cargo policy?",
+    "expected_answer": "Mini Trucks can hold up to 1000kg. Overloading by even 1% is a strict safety violation and incurs a $500 penalty."
+  },
+  {
+    "question": "What are the rules for license expiration and updates?",
+    "expected_answer": "All active drivers must hold active, unexpired licenses. Licenses must be updated 30 days before expiration."
+  },
+  {
+    "question": "What happens if a high risk weather alert is active on a corridor?",
+    "expected_answer": "High risk weather alerts require immediate route detouring using Dijkstra searches. If no detour is available, the trip must be cancelled or delayed."
+  }
+]
