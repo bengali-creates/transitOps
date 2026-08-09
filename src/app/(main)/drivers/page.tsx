@@ -21,7 +21,7 @@ export default async function DriversPage() {
 
   return (
     <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto w-full">
-      <DriverClient initialDrivers={drivers} canWrite={canWrite} />
+      <DriverClient initialDrivers={drivers.data} canWrite={canWrite} />
     </div>
   );
 }
