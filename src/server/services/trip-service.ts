@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { txDb } from "@/db/tx";
 import {
   trips,
@@ -7,21 +7,23 @@ import {
   statusHistory,
 } from "@/db/schema";
 
+export class ConcurrencyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConcurrencyError";
+  }
+}
+
 /**
- * TRIP SERVICE
- * Every mandatory business rule around trips lives here, executed inside a
- * transaction so a vehicle, a driver, and a trip never end up in inconsistent
- * states. Server actions call these functions. They never mutate status directly.
- *
- * Rules enforced:
- *  - Retired / in_shop vehicles cannot be dispatched.
- *  - Suspended drivers or expired licenses cannot be dispatched.
- *  - A vehicle or driver already on_trip cannot be dispatched again.
- *  - Cargo weight must not exceed the vehicle max load capacity.
- *  - Dispatch sets vehicle and driver to on_trip.
- *  - Complete restores both to available.
- *  - Cancel (from dispatched) restores both to available.
+ * Stable 32-bit string hashing helper for Postgres advisory locks.
  */
+function hashStringToInt(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash | 0);
+}
 
 export type DispatchInput = {
   tripId: string;
@@ -29,7 +31,6 @@ export type DispatchInput = {
 };
 
 function isLicenseExpired(expiry: string): boolean {
-  // expiry is a date string (YYYY-MM-DD)
   return new Date(expiry) < new Date();
 }
 
@@ -41,30 +42,36 @@ export async function dispatchTrip({ tripId, actorId }: DispatchInput) {
       throw new Error(`Only draft trips can be dispatched (current: ${trip.status})`);
     }
 
+    const vehicleLockId = hashStringToInt("vehicle_" + trip.vehicleId);
+    const driverLockId = hashStringToInt("driver_" + trip.driverId);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${vehicleLockId});`);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${driverLockId});`);
+
     const [vehicle] = await tx
       .select()
       .from(vehicles)
-      .where(eq(vehicles.id, trip.vehicleId));
+      .where(eq(vehicles.id, trip.vehicleId))
+      .for("update");
     const [driver] = await tx
       .select()
       .from(drivers)
-      .where(eq(drivers.id, trip.driverId));
+      .where(eq(drivers.id, trip.driverId))
+      .for("update");
 
     if (!vehicle) throw new Error("Vehicle not found");
     if (!driver) throw new Error("Driver not found");
 
-    // Guard clauses (early returns via thrown errors).
     if (vehicle.status === "retired" || vehicle.status === "in_shop") {
       throw new Error(`Vehicle is ${vehicle.status} and cannot be dispatched`);
     }
     if (vehicle.status === "on_trip") {
-      throw new Error("Vehicle is already on a trip");
+      throw new ConcurrencyError("Vehicle is already dispatched on another trip.");
     }
     if (driver.status === "suspended") {
       throw new Error("Driver is suspended and cannot be dispatched");
     }
     if (driver.status === "on_trip") {
-      throw new Error("Driver is already on a trip");
+      throw new ConcurrencyError("Driver is already dispatched on another trip.");
     }
     if (isLicenseExpired(driver.licenseExpiryDate)) {
       throw new Error("Driver license has expired");
@@ -79,17 +86,22 @@ export async function dispatchTrip({ tripId, actorId }: DispatchInput) {
 
     await tx
       .update(trips)
-      .set({ status: "dispatched", dispatchedAt: now, startOdometer: vehicle.odometer })
+      .set({ 
+        status: "dispatched", 
+        dispatchedAt: now, 
+        startOdometer: vehicle.odometer,
+        version: trip.version + 1 
+      })
       .where(eq(trips.id, tripId));
 
     await tx
       .update(vehicles)
-      .set({ status: "on_trip" })
+      .set({ status: "on_trip", version: vehicle.version + 1 })
       .where(eq(vehicles.id, vehicle.id));
 
     await tx
       .update(drivers)
-      .set({ status: "on_trip" })
+      .set({ status: "on_trip", version: driver.version + 1 })
       .where(eq(drivers.id, driver.id));
 
     await tx.insert(statusHistory).values([
@@ -145,6 +157,19 @@ export async function completeTrip({
       throw new Error("Only dispatched trips can be completed");
     }
 
+    const [vehicle] = await tx
+      .select()
+      .from(vehicles)
+      .where(eq(vehicles.id, trip.vehicleId))
+      .for("update");
+    const [driver] = await tx
+      .select()
+      .from(drivers)
+      .where(eq(drivers.id, trip.driverId))
+      .for("update");
+
+    if (!vehicle || !driver) throw new Error("Assets not found");
+
     const start = Number(trip.startOdometer ?? 0);
     if (finalOdometer < start) {
       throw new Error("Final odometer cannot be below start odometer");
@@ -161,18 +186,18 @@ export async function completeTrip({
         actualDistance: String(actualDistance),
         revenue: revenue != null ? String(revenue) : trip.revenue,
         completedAt: now,
+        version: trip.version + 1,
       })
       .where(eq(trips.id, tripId));
 
-    // Vehicle odometer advances to the final reading.
     await tx
       .update(vehicles)
-      .set({ status: "available", odometer: String(finalOdometer) })
+      .set({ status: "available", odometer: String(finalOdometer), version: vehicle.version + 1 })
       .where(eq(vehicles.id, trip.vehicleId));
 
     await tx
       .update(drivers)
-      .set({ status: "available" })
+      .set({ status: "available", version: driver.version + 1 })
       .where(eq(drivers.id, trip.driverId));
 
     await tx.insert(statusHistory).values([
@@ -215,20 +240,30 @@ export async function cancelTrip({ tripId, actorId }: DispatchInput) {
     const wasDispatched = trip.status === "dispatched";
     const now = new Date();
 
+    const [vehicle] = await tx
+      .select()
+      .from(vehicles)
+      .where(eq(vehicles.id, trip.vehicleId))
+      .for("update");
+    const [driver] = await tx
+      .select()
+      .from(drivers)
+      .where(eq(drivers.id, trip.driverId))
+      .for("update");
+
     await tx
       .update(trips)
-      .set({ status: "cancelled", cancelledAt: now })
+      .set({ status: "cancelled", cancelledAt: now, version: trip.version + 1 })
       .where(eq(trips.id, tripId));
 
-    // Only restore assets if they were locked by dispatch.
-    if (wasDispatched) {
+    if (wasDispatched && vehicle && driver) {
       await tx
         .update(vehicles)
-        .set({ status: "available" })
+        .set({ status: "available", version: vehicle.version + 1 })
         .where(and(eq(vehicles.id, trip.vehicleId), eq(vehicles.status, "on_trip")));
       await tx
         .update(drivers)
-        .set({ status: "available" })
+        .set({ status: "available", version: driver.version + 1 })
         .where(and(eq(drivers.id, trip.driverId), eq(drivers.status, "on_trip")));
     }
 

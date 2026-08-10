@@ -9,13 +9,8 @@ import {
   dispatchTrip,
   completeTrip,
   cancelTrip,
+  ConcurrencyError,
 } from "@/server/services/trip-service";
-
-/**
- * Trip actions never set status directly. Creation makes a draft; every
- * transition is delegated to trip-service so the business rules and the
- * status_history log stay in one place.
- */
 
 export async function createTrip(formData: FormData) {
   const { session } = await requirePermission("trip:write");
@@ -41,27 +36,48 @@ export async function createTrip(formData: FormData) {
 
 export async function dispatchTripAction(tripId: string) {
   const { session } = await requirePermission("trip:write");
-  const result = await dispatchTrip({ tripId, actorId: session?.user?.id });
-  revalidatePath("/trips");
-  revalidatePath("/dashboard");
-  return result;
+  try {
+    const result = await dispatchTrip({ tripId, actorId: session?.user?.id });
+    revalidatePath("/trips");
+    revalidatePath("/dashboard");
+    return { success: true, ...result };
+  } catch (error) {
+    if (error instanceof ConcurrencyError) {
+      return { success: false, error: "CONCURRENCY_ERROR", message: error.message };
+    }
+    return { success: false, error: "ERROR", message: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 export async function completeTripAction(formData: FormData) {
   const { session } = await requirePermission("trip:write");
-  const parsed = tripCompleteSchema.parse(Object.fromEntries(formData));
-  const result = await completeTrip({ ...parsed, actorId: session?.user?.id });
-  revalidatePath("/trips");
-  revalidatePath("/dashboard");
-  return result;
+  try {
+    const parsed = tripCompleteSchema.parse(Object.fromEntries(formData));
+    const result = await completeTrip({ ...parsed, actorId: session?.user?.id });
+    revalidatePath("/trips");
+    revalidatePath("/dashboard");
+    return { success: true, ...result };
+  } catch (error) {
+    if (error instanceof ConcurrencyError) {
+      return { success: false, error: "CONCURRENCY_ERROR", message: error.message };
+    }
+    return { success: false, error: "ERROR", message: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 export async function cancelTripAction(tripId: string) {
   const { session } = await requirePermission("trip:write");
-  const result = await cancelTrip({ tripId, actorId: session?.user?.id });
-  revalidatePath("/trips");
-  revalidatePath("/dashboard");
-  return result;
+  try {
+    const result = await cancelTrip({ tripId, actorId: session?.user?.id });
+    revalidatePath("/trips");
+    revalidatePath("/dashboard");
+    return { success: true, ...result };
+  } catch (error) {
+    if (error instanceof ConcurrencyError) {
+      return { success: false, error: "CONCURRENCY_ERROR", message: error.message };
+    }
+    return { success: false, error: "ERROR", message: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 import { desc } from "drizzle-orm";

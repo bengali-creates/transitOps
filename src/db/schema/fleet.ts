@@ -36,6 +36,7 @@ export const vehicles = pgTable("vehicles", {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
+  version: integer("version").notNull().default(0),
 });
 
 export const drivers = pgTable("drivers", {
@@ -56,6 +57,7 @@ export const drivers = pgTable("drivers", {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
+  version: integer("version").notNull().default(0),
 });
 
 export const driversRelations = relations(drivers, ({ one }) => ({

@@ -111,7 +111,11 @@ export function AgentPlanPanel() {
   const handleAccept = async () => {
     if (!draftTripId) return;
     try {
-      await dispatchTripAction(draftTripId);
+      const res = await dispatchTripAction(draftTripId);
+      if (res && !res.success) {
+        toast.error(res.message || "Failed to dispatch trip");
+        return;
+      }
       toast.success("Draft trip dispatched successfully!");
       setIsOpen(false);
       window.location.reload();

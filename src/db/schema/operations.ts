@@ -5,6 +5,7 @@ import {
   uuid,
   numeric,
   date,
+  integer,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import {
@@ -47,6 +48,7 @@ export const trips = pgTable("trips", {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
+  version: integer("version").notNull().default(0),
 });
 
 export const maintenanceLogs = pgTable("maintenance_logs", {

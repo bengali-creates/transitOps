@@ -94,7 +94,11 @@ export function TripClient() {
       const newTrip = await createTrip(formData);
       
       if (newTrip && newTrip.id) {
-        await dispatchTripAction(newTrip.id);
+        const res = await dispatchTripAction(newTrip.id);
+        if (res && !res.success) {
+          toast.error(res.message || "Failed to dispatch trip");
+          return;
+        }
         toast.success("Trip created and dispatched successfully!");
         // reset form
         setSource("");
