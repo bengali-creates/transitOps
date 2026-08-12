@@ -14,6 +14,7 @@ import { listVehicles } from "@/server/actions/vehicles";
 import { listDrivers } from "@/server/actions/drivers";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { AgentPlanPanel } from "@/components/agent-plan-panel";
+import { TimelineScrubber } from "@/components/timeline-scrubber";
 
 type Trip = any;
 type Vehicle = any;
@@ -161,27 +162,6 @@ export function TripClient() {
       {/* LEFT COLUMN: CREATE TRIP & LIFECYCLE */}
       <div className="w-full lg:w-[450px] shrink-0 space-y-6">
         
-        {/* LIFECYCLE */}
-        {/* <div>
-          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Trip Lifecycle</h3>
-          <div className="flex items-center justify-between relative">
-            <div className="absolute left-4 right-4 top-[7px] h-[3px] bg-muted/50"></div>
-            {['Draft', 'Dispatched', 'Completed', 'Cancelled'].map((step) => {
-              const isDraft = step === 'Draft';
-              const isDispatched = step === 'Dispatched';
-              const bgClass = isDraft ? 'bg-green-600' : isDispatched ? 'bg-blue-500' : 'bg-muted-foreground';
-              const textClass = isDraft ? 'text-green-600' : isDispatched ? 'text-blue-500' : 'text-muted-foreground';
-              
-              return (
-                <div key={step} className="flex flex-col items-center gap-2 bg-background px-2 z-10">
-                  <div className={`w-4 h-4 rounded-full ${bgClass}`}></div>
-                  <span className={`text-xs font-medium ${textClass}`}>{step}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div> */}
-
         {/* CREATE TRIP FORM */}
         <div>
           <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Create Trip</h3>
@@ -286,7 +266,7 @@ export function TripClient() {
         <div className="grid gap-4">
           {displayTrips.map((trip: any) => (
             <Card key={trip.id} className="bg-card/50 hover:bg-card transition-colors border-dashed">
-              <CardContent className="p-4 flex flex-col sm:flex-row justify-between gap-4">
+              <CardContent className="p-4 flex flex-row justify-between items-center gap-4">
                 <div className="space-y-3 flex-1">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-muted-foreground">TRIP-{trip.id.substring(0,6).toUpperCase()}</span>
@@ -308,6 +288,14 @@ export function TripClient() {
                       {trip.status === 'draft' ? 'Awaiting driver' : trip.status === 'cancelled' ? 'Vehicle went to shop' : '45 min'}
                     </span>
                   </div>
+                </div>
+                <div className="flex items-center self-center">
+                  <TimelineScrubber 
+                    entityType="trip" 
+                    entityId={trip.id} 
+                    entityName={`TRIP-${trip.id.substring(0,6).toUpperCase()}`} 
+                    currentStatus={trip.status} 
+                  />
                 </div>
               </CardContent>
             </Card>

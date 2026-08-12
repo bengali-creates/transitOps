@@ -17,10 +17,7 @@ import {
 import { vehicles } from "./fleet";
 import { users } from "./auth";
 
-/**
- * Vehicle documents (bonus). extractedData holds fields pulled by Bedrock from
- * an uploaded image or PDF, so expiry dates can drive compliance reminders.
- */
+
 export const vehicleDocuments = pgTable("vehicle_documents", {
   id: uuid("id").defaultRandom().primaryKey(),
   vehicleId: uuid("vehicle_id")
@@ -35,10 +32,6 @@ export const vehicleDocuments = pgTable("vehicle_documents", {
     .defaultNow(),
 });
 
-/**
- * Immutable log of automatic status transitions on vehicles, drivers, and trips.
- * Gives auditability for every rule-driven state change and feeds analytics.
- */
 export const statusHistory = pgTable("status_history", {
   id: uuid("id").defaultRandom().primaryKey(),
   entityType: text("entity_type").notNull(), // vehicle | driver | trip | maintenance
@@ -46,13 +39,12 @@ export const statusHistory = pgTable("status_history", {
   fromStatus: text("from_status"),
   toStatus: text("to_status").notNull(),
   reason: text("reason"),
+  metadata: jsonb("metadata"),
   triggeredBy: uuid("triggered_by").references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
-
-/** In-app notifications, also used to back email reminders (bonus). */
 export const notifications = pgTable("notifications", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
@@ -66,11 +58,6 @@ export const notifications = pgTable("notifications", {
     .defaultNow(),
 });
 
-/**
- * Persisted output from Bedrock features: dispatch recommendations, predictive
- * maintenance flags, fuel anomaly findings, and assistant answers.
- * confidence is 0 to 1. payload keeps the full structured model response.
- */
 export const aiSuggestions = pgTable("ai_suggestions", {
   id: uuid("id").defaultRandom().primaryKey(),
   type: aiSuggestionTypeEnum("type").notNull(),
@@ -104,9 +91,7 @@ export const settings = pgTable("settings", {
     .defaultNow(),
 });
 
-/**
- * Assistant conversations to maintain multi-turn chat history.
- */
+
 export const conversations = pgTable("conversations", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),

@@ -6,7 +6,6 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { 
@@ -16,8 +15,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select";
 import { createVehicle, updateVehicle, retireVehicle, listVehicles } from "@/server/actions/vehicles";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { TimelineScrubber } from "@/components/timeline-scrubber";
+import { StatusBadge } from "@/components/status-badge";
 
 export function VehicleClient({ canWrite }: { canWrite: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -45,20 +46,7 @@ export function VehicleClient({ canWrite }: { canWrite: boolean }) {
 
   const vehicles = data?.pages.flatMap((page) => page.data) || [];
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "available":
-        return <Badge className="bg-green-500 hover:bg-green-600">Available</Badge>;
-      case "on_trip":
-        return <Badge className="bg-blue-500 hover:bg-blue-600">On Trip</Badge>;
-      case "in_shop":
-        return <Badge className="bg-orange-500 hover:bg-orange-600">In Shop</Badge>;
-      case "retired":
-        return <Badge className="bg-red-500 hover:bg-red-600">Retired</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
+  const queryClient = useQueryClient();
 
   async function onSubmit(formData: FormData) {
     startTransition(async () => {
@@ -78,7 +66,7 @@ export function VehicleClient({ canWrite }: { canWrite: boolean }) {
         toast.success(`Vehicle ${editingVehicle ? "updated" : "created"} successfully`);
         setIsOpen(false);
         setEditingVehicle(null);
-        window.location.reload();
+        queryClient.invalidateQueries({ queryKey: ["vehicles-infinite"] });
       } catch (err: any) {
         toast.error(err.message || "An error occurred");
       }
@@ -94,7 +82,7 @@ export function VehicleClient({ canWrite }: { canWrite: boolean }) {
             try {
               await retireVehicle(id);
               toast.success("Vehicle retired");
-              window.location.reload();
+              queryClient.invalidateQueries({ queryKey: ["vehicles-infinite"] });
             } catch (err: any) {
               toast.error(err.message || "Failed to retire vehicle");
             }
@@ -225,25 +213,30 @@ export function VehicleClient({ canWrite }: { canWrite: boolean }) {
                 <TableCell>{v.type}</TableCell>
                 <TableCell>{v.maxLoadCapacity}</TableCell>
                 <TableCell>{v.odometer}</TableCell>
-                <TableCell>{getStatusBadge(v.status)}</TableCell>
-                {canWrite && (
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      {v.status !== "retired" ? (
-                        <>
-                          <Button variant="ghost" size="icon" onClick={() => handleEdit(v)}>
-                            <PencilIcon className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleRetire(v.id)}>
-                            <BanIcon className="h-4 w-4" />
-                          </Button>
-                        </>
-                      ) : (
-                        <span className="text-xs text-muted-foreground mr-2">Terminal</span>
-                      )}
-                    </div>
-                  </TableCell>
-                )}
+                <TableCell><StatusBadge status={v.status} /></TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-2">
+                    <TimelineScrubber 
+                      entityType="vehicle" 
+                      entityId={v.id} 
+                      entityName={v.name} 
+                      currentStatus={v.status} 
+                    />
+                    {canWrite && v.status !== "retired" && (
+                      <>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(v)}>
+                          <PencilIcon className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleRetire(v.id)}>
+                          <BanIcon className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                    {canWrite && v.status === "retired" && (
+                      <span className="text-xs text-muted-foreground mr-2">Terminal</span>
+                    )}
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
             {vehicles.length === 0 && (

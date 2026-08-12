@@ -112,6 +112,7 @@ export async function dispatchTrip({ tripId, actorId }: DispatchInput) {
         toStatus: "dispatched",
         reason: "Trip dispatched",
         triggeredBy: actorId,
+        metadata: { startOdometer: vehicle.odometer },
       },
       {
         entityType: "vehicle",
@@ -120,6 +121,7 @@ export async function dispatchTrip({ tripId, actorId }: DispatchInput) {
         toStatus: "on_trip",
         reason: `Dispatched on trip ${tripId}`,
         triggeredBy: actorId,
+        metadata: { odometer: vehicle.odometer },
       },
       {
         entityType: "driver",
@@ -208,6 +210,7 @@ export async function completeTrip({
         toStatus: "completed",
         reason: "Trip completed",
         triggeredBy: actorId,
+        metadata: { finalOdometer, fuelConsumed, actualDistance, revenue },
       },
       {
         entityType: "vehicle",
@@ -215,6 +218,7 @@ export async function completeTrip({
         fromStatus: "on_trip",
         toStatus: "available",
         triggeredBy: actorId,
+        metadata: { odometer: finalOdometer },
       },
       {
         entityType: "driver",
@@ -256,6 +260,17 @@ export async function cancelTrip({ tripId, actorId }: DispatchInput) {
       .set({ status: "cancelled", cancelledAt: now, version: trip.version + 1 })
       .where(eq(trips.id, tripId));
 
+    const logs: Array<any> = [
+      {
+        entityType: "trip",
+        entityId: tripId,
+        fromStatus: trip.status,
+        toStatus: "cancelled",
+        reason: "Trip cancelled",
+        triggeredBy: actorId,
+      }
+    ];
+
     if (wasDispatched && vehicle && driver) {
       await tx
         .update(vehicles)
@@ -265,16 +280,27 @@ export async function cancelTrip({ tripId, actorId }: DispatchInput) {
         .update(drivers)
         .set({ status: "available", version: driver.version + 1 })
         .where(and(eq(drivers.id, trip.driverId), eq(drivers.status, "on_trip")));
+
+      logs.push({
+        entityType: "vehicle",
+        entityId: vehicle.id,
+        fromStatus: "on_trip",
+        toStatus: "available",
+        reason: `Restored available on trip ${tripId} cancel`,
+        triggeredBy: actorId,
+        metadata: { odometer: vehicle.odometer },
+      });
+      logs.push({
+        entityType: "driver",
+        entityId: driver.id,
+        fromStatus: "on_trip",
+        toStatus: "available",
+        reason: `Restored available on trip ${tripId} cancel`,
+        triggeredBy: actorId,
+      });
     }
 
-    await tx.insert(statusHistory).values({
-      entityType: "trip",
-      entityId: tripId,
-      fromStatus: trip.status,
-      toStatus: "cancelled",
-      reason: "Trip cancelled",
-      triggeredBy: actorId,
-    });
+    await tx.insert(statusHistory).values(logs);
 
     return { ok: true as const, assetsRestored: wasDispatched };
   });
