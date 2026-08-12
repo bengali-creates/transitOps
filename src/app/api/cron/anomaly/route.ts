@@ -3,8 +3,13 @@ import { detectAnomalies } from "@/server/services/anomaly-ai";
 
 export async function POST(req: Request) {
   try {
-    // In a real scenario, this would be a cron job or protected endpoint.
-    // For demo purposes, we trigger it manually.
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers.get("Authorization");
+
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     await detectAnomalies();
     return NextResponse.json({ success: true });
   } catch (error) {

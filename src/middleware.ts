@@ -1,16 +1,28 @@
 import { auth } from "./lib/auth";
 import { NextResponse } from "next/server";
 
-/**
- * Every route except the login page and Auth.js endpoints requires a session.
- * Fine-grained permission checks happen in server actions via requirePermission.
- */
+
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const { pathname } = req.nextUrl;
 
   const isPublic =
     pathname === "/" || pathname.startsWith("/api/auth");
+  const isInternal = pathname.startsWith("/api/internal");
+  const isCron = pathname.startsWith("/api/cron");
+
+  if (isInternal) {
+    const apiKey = req.headers.get("x-api-key");
+    const internalSecret = process.env.INTERNAL_SERVICE_SECRET;
+    if (!internalSecret || apiKey !== internalSecret) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return NextResponse.next();
+  }
+
+  if (isCron) {
+    return NextResponse.next();
+  }
 
   if (!isLoggedIn && !isPublic) {
     const url = new URL("/", req.nextUrl.origin);
