@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Plus, Navigation, Truck, User, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -15,23 +15,34 @@ import { listDrivers } from "@/server/actions/drivers";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { AgentPlanPanel } from "@/components/agent-plan-panel";
 import { TimelineScrubber } from "@/components/timeline-scrubber";
+import { useTripFormStore } from "@/store/trip-form-store";
 
 type Trip = any;
 type Vehicle = any;
 type Driver = any;
 
 export function TripClient() {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuggesting, setIsSuggesting] = useState(false);
-  const [suggestionReason, setSuggestionReason] = useState("");
-
-  // Form state
-  const [source, setSource] = useState("");
-  const [destination, setDestination] = useState("");
-  const [vehicleId, setVehicleId] = useState("");
-  const [driverId, setDriverId] = useState("");
-  const [cargoWeight, setCargoWeight] = useState("");
-  const [plannedDistance, setPlannedDistance] = useState("");
+  const {
+    source,
+    setSource,
+    destination,
+    setDestination,
+    vehicleId,
+    setVehicleId,
+    driverId,
+    setDriverId,
+    cargoWeight,
+    setCargoWeight,
+    plannedDistance,
+    setPlannedDistance,
+    isSubmitting,
+    setSubmitting,
+    isSuggesting,
+    setSuggesting,
+    suggestionReason,
+    setSuggestionReason,
+    resetForm,
+  } = useTripFormStore();
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const { data: vehiclesData } = useQuery({
@@ -82,7 +93,7 @@ export function TripClient() {
     e.preventDefault();
     if (!canDispatch || isSubmitting) return;
 
-    setIsSubmitting(true);
+    setSubmitting(true);
     try {
       const formData = new FormData();
       formData.append("source", source);
@@ -101,18 +112,12 @@ export function TripClient() {
           return;
         }
         toast.success("Trip created and dispatched successfully!");
-        // reset form
-        setSource("");
-        setDestination("");
-        setVehicleId("");
-        setDriverId("");
-        setCargoWeight("");
-        setPlannedDistance("");
+        resetForm();
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to dispatch trip");
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   }
   
@@ -121,7 +126,7 @@ export function TripClient() {
       toast.error("Please enter Destination and Cargo Weight first");
       return;
     }
-    setIsSuggesting(true);
+    setSuggesting(true);
     setSuggestionReason("");
     try {
       const res = await fetch("/api/ai/dispatch", {
@@ -144,17 +149,12 @@ export function TripClient() {
     } catch (err: any) {
       toast.error(err.message || "Could not fetch AI suggestions");
     } finally {
-      setIsSuggesting(false);
+      setSuggesting(false);
     }
   }
 
   function handleCancelForm() {
-    setSource("");
-    setDestination("");
-    setVehicleId("");
-    setDriverId("");
-    setCargoWeight("");
-    setPlannedDistance("");
+    resetForm();
   }
 
   return (

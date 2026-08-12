@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription 
 } from "@/components/ui/dialog";
@@ -9,6 +9,7 @@ import { getEntityEvents } from "@/server/actions/history";
 import { HistoryIcon, ClockIcon } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/status-badge";
+import { useTimelineScrubberStore } from "@/store/timeline-scrubber-store";
 
 type TimelineScrubberProps = {
   entityType: "trip" | "vehicle" | "driver";
@@ -17,25 +18,36 @@ type TimelineScrubberProps = {
   currentStatus: string;
 };
 
-export function TimelineScrubber({ entityType, entityId, entityName, currentStatus }: TimelineScrubberProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [events, setEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [reconstructedState, setReconstructedState] = useState<any>(null);
-  const [replayLoading, setReplayLoading] = useState(false);
+export function TimelineScrubber({ entityType: propEntityType, entityId: propEntityId, entityName: propEntityName, currentStatus: propCurrentStatus }: TimelineScrubberProps) {
+  const {
+    isOpen,
+    entityType,
+    entityId,
+    entityName,
+    events,
+    loading,
+    currentIndex,
+    reconstructedState,
+    replayLoading,
+    openScrubber,
+    closeScrubber,
+    setEvents,
+    setLoading,
+    setCurrentIndex,
+    setReconstructedState,
+    setReplayLoading,
+  } = useTimelineScrubberStore();
+
+  const isThisActive = isOpen && entityId === propEntityId;
 
   useEffect(() => {
-    if (isOpen) {
+    if (isThisActive) {
       loadEvents();
-    } else {
-      setEvents([]);
-      setCurrentIndex(0);
-      setReconstructedState(null);
     }
-  }, [isOpen]);
+  }, [isThisActive]);
 
   async function loadEvents() {
+    if (!entityType || !entityId) return;
     setLoading(true);
     try {
       const data = await getEntityEvents(entityType, entityId);
@@ -49,13 +61,14 @@ export function TimelineScrubber({ entityType, entityId, entityName, currentStat
   }
 
   useEffect(() => {
-    if (events.length === 0 || currentIndex < 0 || currentIndex >= events.length) return;
+    if (!isThisActive || events.length === 0 || currentIndex < 0 || currentIndex >= events.length) return;
     
     const selectedEvent = events[currentIndex];
     fetchReplayedState(selectedEvent.createdAt);
-  }, [currentIndex, events]);
+  }, [currentIndex, events, isThisActive]);
 
   async function fetchReplayedState(timestamp: string) {
+    if (!entityType || !entityId) return;
     setReplayLoading(true);
     try {
       const res = await fetch(
@@ -73,11 +86,13 @@ export function TimelineScrubber({ entityType, entityId, entityName, currentStat
 
   return (
     <>
-      <Button variant="ghost" size="icon" onClick={() => setIsOpen(true)}>
+      <Button variant="ghost" size="icon" onClick={() => openScrubber(propEntityType, propEntityId, propEntityName, propCurrentStatus)}>
         <HistoryIcon className="h-4 w-4 text-muted-foreground" />
       </Button>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog open={isThisActive} onOpenChange={(open) => {
+        if (!open) closeScrubber();
+      }}>
         <DialogContent className="max-w-3xl bg-background border shadow-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
               <DialogTitle className="flex items-center gap-2">

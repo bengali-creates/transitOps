@@ -9,21 +9,7 @@ import { cn } from "@/lib/utils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type MessageRole = "user" | "assistant";
-
-interface ActionPill {
-  label: string;
-  actionType: string;
-  payload: Record<string, unknown>;
-}
-
-interface Message {
-  id: string;
-  role: MessageRole;
-  content: string;
-  actions?: ActionPill[];
-  timestamp: Date;
-}
+import { useAICopilotStore, type Message, type ActionPill, type MessageRole } from "@/store/ai-copilot-store";
 
 interface StreamChunk {
   type: "meta" | "text" | "actions";
@@ -65,11 +51,18 @@ async function* parseNDJSONStream(stream: ReadableStream<Uint8Array>) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function AICopilotPanel() {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [messages, setMessages] = React.useState<Message[]>([]);
-  const [input, setInput] = React.useState("");
-  const [conversationId, setConversationId] = React.useState<string | null>(null);
-  const [isStreaming, setIsStreaming] = React.useState(false);
+  const {
+    isOpen,
+    setIsOpen,
+    messages,
+    setMessages,
+    input,
+    setInput,
+    conversationId,
+    setConversationId,
+    isStreaming,
+    setIsStreaming,
+  } = useAICopilotStore();
   const bottomRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
@@ -205,7 +198,7 @@ export function AICopilotPanel() {
           "relative h-9 w-9 rounded-full transition-all duration-200",
           isOpen && "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/30"
         )}
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => setIsOpen(!isOpen)}
         aria-label="Open AI Co-pilot"
         title="AI Co-pilot"
       >
