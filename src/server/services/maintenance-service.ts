@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { txDb } from "@/db/tx";
-import { maintenanceLogs, vehicles, statusHistory } from "@/db/schema";
+import { maintenanceLogs, vehicles, statusHistory, outbox } from "@/db/schema";
 
 /**
  * MAINTENANCE SERVICE
@@ -59,6 +59,12 @@ export async function openMaintenance(input: OpenMaintenanceInput) {
       triggeredBy: input.actorId,
     });
 
+    await tx.insert(outbox).values({
+      eventType: "maintenance_started",
+      payload: { vehicleId: input.vehicleId, maintenanceId: record.id },
+      idempotencyKey: `maintenance_started_${record.id}`,
+    });
+
     return record;
   });
 }
@@ -96,6 +102,12 @@ export async function closeMaintenance(id: string, actorId?: string) {
         toStatus: "available",
         reason: "Maintenance closed",
         triggeredBy: actorId,
+      });
+
+      await tx.insert(outbox).values({
+        eventType: "maintenance_closed",
+        payload: { vehicleId: record.vehicleId, maintenanceId: id },
+        idempotencyKey: `maintenance_closed_${id}`,
       });
     }
 

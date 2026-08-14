@@ -101,3 +101,14 @@ export const conversations = pgTable("conversations", {
     .notNull()
     .defaultNow(),
 });
+
+export const outbox = pgTable("outbox", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  eventType: text("event_type").notNull(),
+  payload: jsonb("payload").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
+  idempotencyKey: text("idempotency_key").unique().notNull(),
+});

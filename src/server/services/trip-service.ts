@@ -5,6 +5,7 @@ import {
   vehicles,
   drivers,
   statusHistory,
+  outbox,
 } from "@/db/schema";
 
 export class ConcurrencyError extends Error {
@@ -133,6 +134,12 @@ export async function dispatchTrip({ tripId, actorId }: DispatchInput) {
       },
     ]);
 
+    await tx.insert(outbox).values({
+      eventType: "trip_dispatched",
+      payload: { tripId, vehicleId: vehicle.id, driverId: driver.id },
+      idempotencyKey: `trip_dispatched_${tripId}`,
+    });
+
     return { ok: true as const };
   });
 }
@@ -229,6 +236,12 @@ export async function completeTrip({
       },
     ]);
 
+    await tx.insert(outbox).values({
+      eventType: "trip_completed",
+      payload: { tripId, vehicleId: trip.vehicleId, driverId: trip.driverId, finalOdometer, revenue },
+      idempotencyKey: `trip_completed_${tripId}`,
+    });
+
     return { ok: true as const, actualDistance };
   });
 }
@@ -301,6 +314,12 @@ export async function cancelTrip({ tripId, actorId }: DispatchInput) {
     }
 
     await tx.insert(statusHistory).values(logs);
+
+    await tx.insert(outbox).values({
+      eventType: "trip_cancelled",
+      payload: { tripId, vehicleId: trip.vehicleId, driverId: trip.driverId },
+      idempotencyKey: `trip_cancelled_${tripId}`,
+    });
 
     return { ok: true as const, assetsRestored: wasDispatched };
   });
