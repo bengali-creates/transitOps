@@ -1,7 +1,8 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { getDashboardStats } from "@/server/actions/dashboard";
 import { DashboardFilters } from "@/components/dashboard-filters";
 import { DashboardRecentTrips } from "@/components/dashboard-recent-trips";
@@ -10,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
 export function DashboardClient() {
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const filters = {
     type: searchParams.get("type") || undefined,
@@ -17,6 +19,24 @@ export function DashboardClient() {
     region: searchParams.get("region") || undefined,
     q: searchParams.get("q") || undefined,
   };
+
+  useEffect(() => {
+    const eventSource = new EventSource("/api/stream");
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("Real-time SSE update received:", data);
+        queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
+        queryClient.invalidateQueries({ queryKey: ["recentTrips"] });
+      } catch (err) {
+        console.error("Error parsing SSE event data:", err);
+      }
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [queryClient]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["dashboardStats", filters],
